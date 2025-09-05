@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>EuphoricDoom — Cyberpunk Trading Simulator</title>
+  <style>
+    :root {
+      --bg0: #0a0f14;
+      --bg1: #0f1720;
+      --panel: #121a24cc;
+      --neon: #00ffc8;
+      --neon2: #9d4dff;
+      --text: #dffaf4;
+      --warn: #ff5c7a;
+      --good: #70ffa7;
+      --gold: #ffd166;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 800px at 20% 0%, #0c1520 0%, var(--bg0) 45%, #06090d 100%),
+                  linear-gradient(135deg, #0a0f16 0%, #0a0f14 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
+      letter-spacing: 0.2px;
+    }
+
+    /* Neon utility */
+    .glow { text-shadow: 0 0 6px var(--neon), 0 0 14px var(--neon2); }
+    .ring { box-shadow: 0 0 0 1px #00ffc833, 0 0 18px #00ffc822 inset, 0 0 28px #9d4dff22 inset, 0 0 32px #00ffc811; }
+
+    /* Layout */
+    #app { display: grid; grid-template-rows: auto auto 1fr auto; min-height: 100dvh; }
+    header {
+      padding: 14px 16px; position: sticky; top: 0; z-index: 10;
+      background: linear-gradient(180deg, #0d1420, #0b1018 55%, transparent);
+      border-bottom: 1px solid #0ef2c922;
+    }
+    header h1 { margin: 0; font-weight: 700; font-size: clamp(18px, 3.2vw, 26px); }
+    header small { color: #9ad9cc; }
+
+    #hud {
+      display: grid; gap: 8px; padding: 12px 16px; align-items: center;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      border-bottom: 1px solid #0ef2c922; background: #0a121a77; backdrop-filter: blur(6px);
+    }
+    @media (min-width: 800px) { #hud { grid-template-columns: repeat(6, minmax(0,1fr)); } }
+    .chip {
+      background: var(--panel); border: 1px solid #0ef2c922; border-radius: 12px; padding: 8px 10px;
+      display: flex; gap: 8px; align-items: baseline; justify-content: space-between;
+    }
+    .chip b { color: var(--neon); font-weight: 700; }
+
+    /* Nav */
+    #nav { display: grid; grid-auto-flow: column; gap: 8px; padding: 8px 12px; overflow-x: auto; }
+    .tab-btn {
+      white-space: nowrap; border: 1px solid #0ef2c933; background: #0b142033; color: var(--text);
+      border-radius: 999px; padding: 10px 14px; cursor: pointer; transition: transform .08s ease;
+    }
+    .tab-btn.active { background: #0b203033; border-color: #00ffc866; box-shadow: 0 0 18px #00ffc81f inset; }
+    .tab-btn:active { transform: translateY(1px); }
+
+    /* Panels */
+    #panel { padding: 12px; }
+    .card { background: var(--panel); border: 1px solid #0ef2c933; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+    .title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom: 8px; }
+    .title h2 { margin:0; font-size: 16px; }
+
+    .grid { display: grid; gap: 10px; }
+    @media (min-width: 900px) { .grid.cols-2 { grid-template-columns: 1.2fr 1fr; } }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 8px; border-bottom: 1px solid #0ef2c922; text-align: left; }
+    th { color: #a0f7e7; font-weight: 600; }
+    tr:hover { background: #0f1b26aa; }
+
+    .btn {
+      border: 1px solid #00ffc844; color: var(--text); background: #0e1b26; border-radius: 10px; padding: 8px 10px; cursor: pointer;
+    }
+    .btn:hover { box-shadow: 0 0 10px #00ffc822 inset; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.primary { background: linear-gradient(180deg, #0ef2c922, #0ef2c911); border-color: #00ffc877; }
+    .btn.warn { border-color: var(--warn); color: #ffdbe1; }
+
+    input, select { width: 100%; background: #0b131c; border: 1px solid #0ef2c933; color: var(--text); border-radius: 10px; padding: 8px 10px; }
+
+    /* Event Log */
+    #log { height: 26vh; min-height: 160px; overflow: auto; padding: 8px 12px; background: #081018aa; border-top: 1px solid #0ef2c922; }
+    .logline { font-size: 13px; color: #bfeee3; border-left: 2px solid #0ef2c966; padding-left: 8px; margin: 6px 0; }
+    .logline .t { color: #6ee7cf; }
+    .logline.bad { border-color: var(--warn); color: #ffc8d2; }
+    .logline.good { border-color: var(--good); color: #c2ffd8; }
+
+    /* Modal */
+    .modal { position: fixed; inset: 0; background: #000000cc; display: none; align-items: center; justify-content: center; padding: 12px; }
+    .modal .inner { width: min(980px, 100%); max-height: 88vh; overflow: auto; background: var(--panel); border: 1px solid #0ef2c933; border-radius: 16px; padding: 16px; }
+
+    .pill { display:inline-block; padding:2px 8px; border:1px solid #00ffc866; border-radius:999px; font-size:12px; color:#9feee0; }
+    .k { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: #9ad9cc; }
+  
+/* === Responsive Scaling Additions === */
+#app { width: min(100%, 1280px); margin: 0 auto; }
+header, #hud, #nav, #panel { max-width: 100%; }
+
+/* Let wide tables scroll on tiny screens instead of blowing up the layout */
+#panel { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+
+/* Collapse two-column layouts to one column on narrow viewports */
+@media (max-width: 900px) {
+  .grid.cols-2 { grid-template-columns: 1fr; }
+}
+
+/* Tighten spacing and font size on small devices */
+@media (max-width: 700px) {
+  body { font-size: 14px; }
+  .tab-btn { padding: 8px 10px; }
+  th, td { padding: 6px; }
+  header h1 { font-size: clamp(16px, 5vw, 22px); }
+  #hud { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+</style>
+</head>
+<body>
+  <div id="app">
+    <header class="ring">
+      <h1 class="glow">EuphoricDoom <small>— Cyberpunk Trading Simulator</small></h1>
+      <div class="k">Turn‑based • Single file • Mobile friendly</div>
+    </header>
+
+    <section id="hud">
+      <div class="chip"><span>Location</span><b id="hud-location">—</b></div>
+      <div class="chip"><span>Day</span><b id="hud-day">1</b></div>
+      <div class="chip"><span>Credits</span><b id="hud-credits">0</b></div>
+      <div class="chip"><span>Health</span><b id="hud-health">100</b></div>
+      <div class="chip"><span>Capacity</span><b id="hud-capacity">0/0</b></div>
+      <div class="chip"><span>Level</span><b id="hud-level">1</b></div>
+    </section>
+
+    <nav id="nav">
+      <button class="tab-btn active" data-tab="trade">Trade</button>
+      <button class="tab-btn" data-tab="inventory">Inventory</button>
+      <button class="tab-btn" data-tab="map">Travel</button>
+      <button class="tab-btn" data-tab="character">Character</button>
+      <button class="tab-btn" data-tab="quests">Quests</button>
+      <button class="tab-btn" data-tab="bank">Bank</button>
+      <button class="tab-btn" data-tab="hospital">Hospital</button>
+      <button class="tab-btn" data-tab="stocks">Stocks</button>
+      <span style="flex:1"></span>
+      <button class="tab-btn" id="btn-save">Save</button>
+      <button class="tab-btn" id="btn-load">Load</button>
+      <button class="tab-btn" id="btn-new">New Game</button>
+      <button class="tab-btn" id="btn-help">Help</button>
+    </nav>
+
+    <main id="panel">
+      <!-- Panels rendered here -->
+    </main>
+
+    <section id="log"></section>
+  </div>
+
+  <!-- Character Creation Modal -->
+  <div class="modal" id="modal-cc">
+    <div class="inner">
+      <div class="title"><h2>New Runner Setup</h2><button class="btn" id="cc-close">Skip</button></div>
+      <div class="grid cols-2">
+        <div class="card">
+          <div class="title"><h2>Identity</h2></div>
+          <label>Name<input id="cc-name" placeholder="Handle" maxlength="24"></label>
+          <div style="height:10px"></div>
+          <label>Background
+            <select id="cc-bg">
+              <option value="street">Street Kid (+2 Agility, +1 Charisma)</option>
+              <option value="corp">Ex‑Corp (+2 Tech, +1 Charisma)</option>
+              <option value="nomad">Nomad (+2 Strength, +10 Health)</option>
+            </select>
+          </label>
+          <div class="k" style="margin-top:6px">Backgrounds grant starting bonuses.</div>
+        </div>
+        <div class="card">
+          <div class="title"><h2>Allocate Stats <span class="pill" id="cc-points">5 pts</span></h2></div>
+          <div id="cc-stats"></div>
+          <div style="height:10px"></div>
+          <button class="btn primary" id="cc-start">Start Run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="modal" id="modal-help">
+    <div class="inner">
+      <div class="title"><h2>How to Play</h2><button class="btn" data-close="modal-help">Close</button></div>
+      <div class="grid">
+        <div class="card">
+          <p>Every major action advances <b>1 day</b>. Buy low, sell high, and dodge heat.</p>
+          <ul>
+            <li><b>Trade:</b> Buy/Sell items. Use <i>Max</i> / <i>Sell All</i>.</li>
+            <li><b>Travel:</b> Move between districts. Random risks.</li>
+            <li><b>Bank / Loan:</b> Park credits or borrow at interest.</li>
+            <li><b>Hospital:</b> Heal damage. Staying alive is profitable.</li>
+            <li><b>Stocks:</b> Gamble on megacorps. Volatile but legal.</li>
+          </ul>
+          <p class="k">Pro tips: Charisma improves prices. Strength raises carry capacity. Agility reduces travel risk.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // ---------- Data ----------
+    const ITEMS = [
+      {id:'meds', name:'Synth Meds', base:120, weight:1, cat:'Medical', illegal:false},
+      {id:'chips', name:'Black ICE Chips', base:420, weight:1, cat:'Tech', illegal:true},
+      {id:'dust', name:'Neon Dust', base:260, weight:1, cat:'Contraband', illegal:true},
+      {id:'arms', name:'Smart Pistols', base:560, weight:2, cat:'Weapons', illegal:true},
+      {id:'food', name:'Soy Rations', base:40, weight:1, cat:'Goods', illegal:false},
+      {id:'mods', name:'Street Aug Parts', base:300, weight:2, cat:'Tech', illegal:false},
+      {id:'rare', name:'Quantum Cores', base:900, weight:1, cat:'Exotic', illegal:true},
+    ];
+
+    const DISTRICTS = [
+      {id:'spire', name:'Apex Spire', priceMod:1.15, risk:0.04},
+      {id:'market', name:'Shinjuku Market', priceMod:0.95, risk:0.06},
+      {id:'slums', name:'Chrome Slums', priceMod:0.85, risk:0.09},
+      {id:'docks', name:'Neon Docks', priceMod:1.00, risk:0.05},
+      {id:'arcology', name:'Helix Arcology', priceMod:1.10, risk:0.03},
+    ];
+
+    const STOCKS = [
+      {id:'NX', name:'Nexacore', price: 50},
+      {id:'VL', name:'Viralight', price: 80},
+      {id:'QM', name:'Q‑MagiTek', price: 120},
+    ];
+
+    const BACKGROUND_BONUS = {
+      street: (s)=>{ s.agility+=2; s.charisma+=1; },
+      corp:   (s)=>{ s.tech+=2; s.charisma+=1; },
+      nomad:  (s)=>{ s.strength+=2; s.health+=10; },
+    };
+
+    // ---------- State ----------
+    const GS = {
+      day: 1,
+      location: 'market',
+      credits: 1000,
+      health: 100,
+      maxHealth: 100,
+      xp: 0,
+      level: 1,
+      statPoints: 0,
+      name: 'Rook',
+      stats: { strength:5, agility:5, hacking:5, charisma:5, tech:5 },
+      inventory: {}, // id -> qty
+      prices: {}, // itemId -> price at current district
+      capacity: 50, // weight limit
+      debt: 0,
+      bank: 0,
+      stocks: {}, // stockId -> shares
+      rumors: [], // recent price events
+    };
+
+    // ---------- Utilities ----------
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+    const fmt = n => n.toLocaleString(undefined, {maximumFractionDigits:0});
+    const rand = (a,b)=> Math.random()*(b-a)+a;
+    const clamp = (v, a, b)=> Math.max(a, Math.min(b, v));
+
+    function log(msg, type=''){
+      const el = document.createElement('div');
+      el.className = `logline ${type}`;
+      const t = new Date().toLocaleTimeString();
+      el.innerHTML = `<span class="t">[${t}]</span> ${msg}`;
+      $('#log').prepend(el);
+    }
+
+    function invWeight(){
+      let w=0; for(const id in GS.inventory){ const item = ITEMS.find(i=>i.id===id); w += (item?.weight||0) * GS.inventory[id]; }
+      return w;
+    }
+
+    function capacityFromStrength(){
+      return 40 + GS.stats.strength * 2; // scales with strength
+    }
+
+    function priceWithCharisma(base){
+      // Charisma gives up to ~10% discount at 15+ charisma, penalty if very low
+      const c = GS.stats.charisma;
+      const adj = (c-5) * 0.01; // -5%..+10%
+      return Math.max(1, Math.round(base * (1 - clamp(adj, -0.10, 0.10))));
+    }
+
+    // ---------- Economy ----------
+    function rollPrices(){
+      GS.prices = {};
+      const district = DISTRICTS.find(d=>d.id===GS.location);
+      ITEMS.forEach(it=>{
+        const vol = rand(0.75, 1.35); // daily volatility
+        const rumor = GS.rumors.find(r=> r.item===it.id);
+        const rumorMod = rumor ? rumor.mult : 1;
+        const p = Math.max(4, Math.round(it.base * district.priceMod * vol * rumorMod));
+        GS.prices[it.id] = p;
+      });
+    }
+
+    function triggerRumor(){
+      GS.rumors = GS.rumors.filter(r=> (GS.day - r.day) <= rand(2,4)); // drop old
+      if(Math.random() < 0.35){
+        const pick = ITEMS[Math.floor(Math.random()*ITEMS.length)];
+        const mult = Math.random() < 0.5 ? rand(1.3,1.9) : rand(0.55,0.8);
+        GS.rumors.push({ item: pick.id, mult, day: GS.day });
+        log(`<b>Market rumor</b>: ${pick.name} ${(mult>1? 'surges':'crashes')}!`, mult>1?'good':'bad');
+      }
+    }
+
+    function advanceDay(reason=''){
+      GS.day += 1;
+      // Interest / debt growth
+      if(GS.debt>0){ const r = 0.03 - Math.min(0.02, GS.stats.hacking*0.001); const add = Math.ceil(GS.debt * r); GS.debt += add; log(`Loan interest accrued: <b>${fmt(add)}</b> cr.`, 'bad'); }
+      // Bank interest (low)
+      if(GS.bank>0){ const add = Math.floor(GS.bank * 0.002); GS.bank += add; if(add>0) log(`Bank interest: +<b>${fmt(add)}</b> cr.`, 'good'); }
+      // Stocks random walk
+      STOCKS.forEach(s=>{ const drift = rand(-0.09,0.12); s.price = Math.max(1, Math.round(s.price * (1+drift))); });
+      // Travel/event risks happen after travel specifically (handled in travelTo)
+      triggerRumor();
+      rollPrices();
+      renderHUD();
+      if(reason) log(`<i>Day advances</i> — ${reason}`);
+    }
+
+    // ---------- Trading ----------
+    function buy(itemId, qty){
+      const price = GS.prices[itemId];
+      const finalPrice = priceWithCharisma(price);
+      const item = ITEMS.find(i=>i.id===itemId);
+      if(!item) return;
+      const maxByMoney = Math.floor(GS.credits / finalPrice);
+      const maxByCapacity = Math.floor((GS.capacity - invWeight()) / item.weight);
+      const canBuy = clamp(qty, 0, Math.min(maxByMoney, maxByCapacity));
+      if(canBuy <= 0) { log(`Cannot buy ${item.name}: insufficient funds or capacity.`, 'bad'); return; }
+      GS.credits -= canBuy * finalPrice;
+      GS.inventory[itemId] = (GS.inventory[itemId]||0) + canBuy;
+      GS.xp += canBuy;
+      levelCheck();
+      log(`Bought <b>${canBuy}</b> × ${item.name} @ <b>${fmt(finalPrice)}</b> each.`, 'good');
+      renderHUD();
+      renderTrade();
+    }
+
+   function sell(itemId, qty){
+      const price = GS.prices[itemId];
+      const finalPrice = Math.round(price * (1 + Math.min(0.10, (GS.stats.charisma-5)*0.01))); // small charisma boost on sell
+      const have = GS.inventory[itemId]||0;
+      const canSell = clamp(qty, 0, have);
+      if(canSell <= 0){ log(`You don't have that many.`, 'bad'); return; }
+      GS.inventory[itemId] = have - canSell;
+      if(GS.inventory[itemId] <= 0) delete GS.inventory[itemId];
+      const gain = canSell * finalPrice;
+      GS.credits += gain;
+      GS.xp += canSell;
+      levelCheck();
+      log(`Sold <b>${canSell}</b> × ${ITEMS.find(i=>i.id===itemId).name} @ <b>${fmt(finalPrice)}</b>.`, 'good');
+      renderHUD();
+      const active = document.querySelector('.tab-btn.active')?.dataset.tab || 'trade';
+      render(active);
+    }
+
+    function levelCheck(){
+      const need = GS.level * 100;
+      if(GS.xp >= need){ GS.level++; GS.statPoints++; log(`Level up! You are now <b>Level ${GS.level}</b>. +1 Stat Point.`, 'good'); renderHUD(); renderCharacter(); }
+    }
+
+    // ---------- Travel & Risks ----------
+    function travelTo(did){
+      if(did === GS.location){ log(`You're already in ${DISTRICTS.find(d=>d.id===did).name}.`); return; }
+      const from = DISTRICTS.find(d=>d.id===GS.location).name;
+      GS.location = did;
+      const d = DISTRICTS.find(d=>d.id===did);
+      // Risk roll (reduced by agility)
+      const risk = Math.max(0.01, d.risk - GS.stats.agility*0.002);
+      let msg = `Traveled from ${from} to <b>${d.name}</b>.`;
+      if(Math.random() < risk){
+        // Event: police shake or ambush
+        const carryingIllegal = Object.keys(GS.inventory).some(id=> ITEMS.find(i=>i.id===id)?.illegal);
+        if(carryingIllegal && Math.random()<0.7){
+          // Fine or injury
+          if(Math.random()<0.5){
+            const fine = Math.min(GS.credits, Math.floor(rand(50,200)));
+            GS.credits -= fine; msg += ` Police shake‑down: lost <b>${fmt(fine)}</b> credits.`; log(msg, 'bad');
+          } else {
+            const dmg = Math.floor(rand(6,18)); GS.health = Math.max(1, GS.health - dmg); msg += ` Street ambush: took <b>${dmg}</b> damage.`; log(msg, 'bad');
+          }
+        } else {
+          const dmg = Math.floor(rand(2,8)); GS.health = Math.max(1, GS.health - dmg); msg += ` Hazards en route: <b>${dmg}</b> damage.`; log(msg, 'bad');
+        }
+      } else {
+        log(msg, 'good');
+      }
+      advanceDay('travel');
+      if(GS.health<=0){ gameOver('You succumbed to your wounds while traveling.'); }
+      renderHUD();
+      renderMap();
+    }
+
+    // ---------- Bank & Loans ----------
+    function deposit(amount){
+      amount = Math.floor(amount);
+      if(amount<=0 || amount>GS.credits){ log('Invalid deposit amount.', 'bad'); return; }
+      GS.credits -= amount; GS.bank += amount; log(`Deposited <b>${fmt(amount)}</b> credits.`, 'good'); renderHUD(); renderBank();
+    }
+    function withdraw(amount){
+      amount = Math.floor(amount);
+      if(amount<=0 || amount>GS.bank){ log('Invalid withdrawal.', 'bad'); return; }
+      GS.bank -= amount; GS.credits += amount; log(`Withdrew <b>${fmt(amount)}</b> credits.`, 'good'); renderHUD(); renderBank();
+    }
+    function borrow(amount){
+      amount = Math.floor(amount);
+      if(amount<=0){ log('Invalid loan amount.', 'bad'); return; }
+      GS.credits += amount; GS.debt += amount; log(`Took a loan of <b>${fmt(amount)}</b> credits. Keep an eye on interest.`, 'warn'); renderHUD(); renderBank();
+    }
+    function repay(amount){
+      amount = Math.floor(amount);
+      if(amount<=0 || amount>GS.credits){ log('Invalid repayment.', 'bad'); return; }
+      const pay = Math.min(amount, GS.debt);
+      GS.credits -= pay; GS.debt -= pay; log(`Repaid <b>${fmt(pay)}</b> credits of debt.`, 'good'); renderHUD(); renderBank();
+    }
+
+    // ---------- Hospital ----------
+    function healAll(){
+      const missing = GS.maxHealth - GS.health; if(missing<=0){ log('Already at full health.'); return; }
+      const cost = Math.max(10, missing * (1.8 - Math.min(0.6, GS.stats.tech*0.02))); // tech reduces cost
+      const c = Math.ceil(cost);
+      if(GS.credits < c){ log('Not enough credits to heal.', 'bad'); return; }
+      GS.credits -= c; GS.health = GS.maxHealth; log(`Healed to full for <b>${fmt(c)}</b> credits.`, 'good'); renderHUD(); renderHospital();
+      advanceDay('recovery');
+    }
+
+    // ---------- Stocks ----------
+    function buyStock(id, qty){
+      const s = STOCKS.find(x=>x.id===id); if(!s) return;
+      const cost = s.price * qty; if(qty<=0 || cost>GS.credits){ log('Invalid stock buy.', 'bad'); return; }
+      GS.credits -= cost; GS.stocks[id] = (GS.stocks[id]||0)+qty; log(`Bought <b>${qty}</b> ${s.name} @ ${fmt(s.price)}.`, 'good'); renderStocks(); renderHUD();
+    }
+    function sellStock(id, qty){
+      const s = STOCKS.find(x=>x.id===id); const have = GS.stocks[id]||0; if(qty<=0 || qty>have){ log('Invalid stock sell.', 'bad'); return; }
+      GS.stocks[id] = have - qty; const gain = s.price*qty; GS.credits += gain; log(`Sold <b>${qty}</b> ${s.name} @ ${fmt(s.price)}.`, 'good'); renderStocks(); renderHUD();
+    }
+
+    // ---------- UI Rendering ----------
+    function renderHUD(){
+      GS.capacity = capacityFromStrength();
+      $('#hud-location').textContent = DISTRICTS.find(d=>d.id===GS.location).name;
+      $('#hud-day').textContent = GS.day;
+      $('#hud-credits').textContent = fmt(GS.credits);
+      $('#hud-health').textContent = `${GS.health}/${GS.maxHealth}`;
+      $('#hud-capacity').textContent = `${invWeight()}/${GS.capacity}`;
+      $('#hud-level').textContent = `${GS.level} (${GS.xp})`;
+    }
+
+    function setPanel(html){ $('#panel').innerHTML = html; }
+
+    function renderTrade(){
+      const rows = ITEMS.map(it=>{
+        const p = GS.prices[it.id];
+        const finalBuy = priceWithCharisma(p);
+        const have = GS.inventory[it.id]||0;
+        const maxByMoney = Math.floor(GS.credits / finalBuy);
+        const maxByCapacity = Math.floor((GS.capacity - invWeight()) / it.weight);
+        const maxBuy = Math.max(0, Math.min(maxByMoney, maxByCapacity));
+        return `
+          <tr>
+            <td><b>${it.name}</b><div class="k">${it.cat}${it.illegal?' • <span style="color:#ff86a0">illegal</span>':''}</div></td>
+            <td>${fmt(finalBuy)}</td>
+            <td>${fmt(Math.round(p*0.95))}</td>
+            <td>${have}</td>
+            <td>
+              <div style="display:flex; gap:6px; align-items:center">
+                <input type="number" min="1" value="1" id="qty-${it.id}" style="width:86px">
+                <button class="btn" data-buy="${it.id}">Buy</button>
+                <button class="btn" data-buymax="${it.id}">Max</button>
+                <button class="btn" data-sell="${it.id}">Sell 1</button>
+                <button class="btn" data-sellall="${it.id}">Sell All</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+
+      setPanel(`
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="title"><h2>Market — ${DISTRICTS.find(d=>d.id===GS.location).name}</h2><span class="pill">Rumors active: ${GS.rumors.length}</span></div>
+            <table>
+              <thead><tr><th>Item</th><th>Buy</th><th>Sell</th><th>Owned</th><th>Actions</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="title"><h2>Rumors & Events</h2><button class="btn" id="btn-refresh">Refresh Prices</button></div>
+            <div id="rumors">${GS.rumors.length? GS.rumors.map(r=>`<div class="logline ${r.mult>1?'good':'bad'}">${ITEMS.find(i=>i.id===r.item).name} ${r.mult>1?'surge':'crash'} in effect.</div>`).join('') : '<div class="k">No persistent rumors today.</div>'}</div>
+          </div>
+        </div>
+      `);
+
+      // wire
+      $('#btn-refresh').onclick = ()=>{ advanceDay('market recalibration'); renderTrade(); };
+      $$('#panel [data-buy]').forEach(b=> b.onclick = ()=>{
+        const id = b.getAttribute('data-buy'); const q = parseInt($(`#qty-${id}`).value||'1',10); buy(id, q);
+      });
+      $$('#panel [data-buymax]').forEach(b=> b.onclick = ()=>{
+        const id = b.getAttribute('data-buymax');
+        const price = priceWithCharisma(GS.prices[id]); const item = ITEMS.find(i=>i.id===id);
+        const maxByMoney = Math.floor(GS.credits / price); const maxByCapacity = Math.floor((GS.capacity - invWeight())/item.weight);
+        const q = Math.max(0, Math.min(maxByMoney, maxByCapacity)); buy(id, q);
+      });
+      $$('#panel [data-sell]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-sell'); sell(id, 1); });
+      $$('#panel [data-sellall]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-sellall'); sell(id, GS.inventory[id]||0); });
+    }
+
+    function renderInventory(){
+      const rows = Object.keys(GS.inventory).length ? Object.entries(GS.inventory).map(([id,qty])=>{
+        const it = ITEMS.find(i=>i.id===id); const weight = it.weight*qty;
+        return `<tr><td><b>${it.name}</b></td><td>${qty}</td><td>${weight}</td><td><button class="btn" data-drop="${id}">Drop 1</button></td></tr>`;
+      }).join('') : '<tr><td colspan="4" class="k">Your pockets echo. Go buy something.</td></tr>';
+
+      setPanel(`
+        <div class="card">
+          <div class="title"><h2>Inventory</h2><span class="pill">Load ${invWeight()}/${GS.capacity}</span></div>
+          <table>
+            <thead><tr><th>Item</th><th>Qty</th><th>Weight</th><th>Action</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `);
+
+      $$('#panel [data-drop]').forEach(b=> b.onclick = ()=>{
+        const id = b.getAttribute('data-drop'); if((GS.inventory[id]||0)>0){ GS.inventory[id]--; if(GS.inventory[id]<=0) delete GS.inventory[id]; log(`Dropped 1 × ${ITEMS.find(i=>i.id===id).name}.`,'warn'); renderInventory(); renderHUD(); }
+      });
+    }
+
+    function renderMap(){
+      const cards = DISTRICTS.map(d=>{
+        const here = d.id===GS.location; const risk = Math.round(Math.max(1, (d.risk - GS.stats.agility*0.002)*100));
+        return `<div class="card">
+          <div class="title"><h2>${d.name}</h2>${here?'<span class="pill">Here</span>':`<span class="pill">Risk ~${risk}%</span>`}</div>
+          <div class="k">Market mod: ${(d.priceMod*100).toFixed(0)}%</div>
+          ${here?'' : `<div style="margin-top:8px"><button class="btn primary" data-go="${d.id}">Travel</button></div>`}
+        </div>`;
+      }).join('');
+
+      setPanel(`<div class="grid">${cards}</div>`);
+      $$('#panel [data-go]').forEach(b=> b.onclick = ()=> travelTo(b.getAttribute('data-go')) );
+    }
+
+    function renderCharacter(){
+      const s = GS.stats;
+      const statRow = (k, label)=>`
+        <tr><td>${label}</td><td>${s[k]}</td><td>${k==='strength'?'Affects carry capacity':k==='agility'?'Reduces travel risk':k==='hacking'?'Cuts loan interest':k==='charisma'?'Improves trade prices':'Lowers hospital costs'}</td>
+        ${GS.statPoints>0?`<td><button class="btn" data-up="${k}">+1</button></td>`:'<td></td>'}
+        </tr>`;
+
+      setPanel(`
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="title"><h2>Runner</h2></div>
+            <div class="k">Name</div>
+            <div style="display:flex; gap:8px; align-items:center">
+              <input id="char-name" value="${GS.name}"><button class="btn" id="btn-rename">Rename</button>
+            </div>
+            <div style="height:10px"></div>
+            <div class="k">Level ${GS.level} • XP ${GS.xp} • Stat points <span class="pill">${GS.statPoints}</span></div>
+          </div>
+          <div class="card">
+            <div class="title"><h2>Stats</h2></div>
+            <table>
+              <thead><tr><th>Stat</th><th>Value</th><th>Effect</th><th></th></tr></thead>
+              <tbody>
+                ${statRow('strength','Strength')}
+                ${statRow('agility','Agility')}
+                ${statRow('hacking','Hacking')}
+                ${statRow('charisma','Charisma')}
+                ${statRow('tech','Tech')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `);
+
+      $('#btn-rename').onclick = ()=>{ const v=$('#char-name').value.trim(); if(v){ GS.name=v; log(`New handle: <b>${GS.name}</b>`); }}
+      $$('#panel [data-up]').forEach(b=> b.onclick = ()=>{ if(GS.statPoints>0){ GS.stats[b.getAttribute('data-up')]++; GS.statPoints--; renderCharacter(); renderHUD(); }});
+    }
+
+    function renderQuests(){
+      setPanel(`
+        <div class="card">
+          <div class="title"><h2>Contracts</h2></div>
+          <div class="k">Starter gigs rotate daily.</div>
+          <div style="height:8px"></div>
+          <div id="q-list"></div>
+        </div>
+      `);
+
+      // Simple daily quest templates
+      const contracts = [
+        { id:'q1', text:'Deliver 5 × Synth Meds to Helix Arcology', need:{item:'meds', qty:5}, loc:'arcology', reward: 320 },
+        { id:'q2', text:'Sell 10 × Soy Rations anywhere', need:{item:'food', qty:10}, loc:null, reward: 200 },
+        { id:'q3', text:'Offload 3 × Black ICE Chips in Apex Spire', need:{item:'chips', qty:3}, loc:'spire', reward: 600 },
+      ];
+      const box = $('#q-list');
+      contracts.forEach(q=>{
+        const el = document.createElement('div'); el.className='card';
+        el.innerHTML = `<div class="title"><h2>${q.text}</h2><span class="pill">Reward ${fmt(q.reward)}</span></div>
+          <button class="btn" data-turnin="${q.id}">Turn In</button>`;
+        box.appendChild(el);
+      });
+      $$('#panel [data-turnin]').forEach(b=> b.onclick = ()=>{
+        const id=b.getAttribute('data-turnin'); const q = contracts.find(x=>x.id===id);
+        if(q.loc && GS.location!==q.loc){ log('Wrong district for this contract.', 'bad'); return; }
+        const have = GS.inventory[q.need.item]||0; if(have<q.need.qty){ log('You lack the required goods.', 'bad'); return; }
+        GS.inventory[q.need.item] = have - q.need.qty; if(GS.inventory[q.need.item]<=0) delete GS.inventory[q.need.item];
+        GS.credits += q.reward; GS.xp += q.reward/5; levelCheck(); log(`Contract completed: +<b>${fmt(q.reward)}</b> credits.`, 'good'); renderHUD(); renderInventory();
+      });
+    }
+
+    function renderBank(){
+      setPanel(`
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="title"><h2>Bank</h2><span class="pill">On hand: ${fmt(GS.credits)}</span></div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px">
+              <input id="dep-amt" type="number" min="1" placeholder="Amount">
+              <button class="btn" id="dep">Deposit</button>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center">
+              <input id="wd-amt" type="number" min="1" placeholder="Amount">
+              <button class="btn" id="wd">Withdraw</button>
+            </div>
+            <div class="k" style="margin-top:6px">Savings: <b>${fmt(GS.bank)}</b></div>
+          </div>
+          <div class="card">
+            <div class="title"><h2>Loan Shark</h2><span class="pill">Debt: ${fmt(GS.debt)}</span></div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px">
+              <input id="loan-amt" type="number" min="1" placeholder="Borrow amount">
+              <button class="btn warn" id="loan">Borrow</button>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center">
+              <input id="repay-amt" type="number" min="1" placeholder="Repay amount">
+              <button class="btn" id="repay">Repay</button>
+            </div>
+            <div class="k" style="margin-top:6px">Daily interest ~<b>${((0.03 - Math.min(0.02, GS.stats.hacking*0.001))*100).toFixed(1)}%</b></div>
+          </div>
+        </div>
+      `);
+      $('#dep').onclick = ()=> deposit(parseInt($('#dep-amt').value||'0',10));
+      $('#wd').onclick = ()=> withdraw(parseInt($('#wd-amt').value||'0',10));
+      $('#loan').onclick = ()=> borrow(parseInt($('#loan-amt').value||'0',10));
+      $('#repay').onclick = ()=> repay(parseInt($('#repay-amt').value||'0',10));
+    }
+
+    function renderHospital(){
+      setPanel(`
+        <div class="card">
+          <div class="title"><h2>Clinic</h2><span class="pill">Health ${GS.health}/${GS.maxHealth}</span></div>
+          <p>Patch yourself up. Costs scale with missing health; <b>Tech</b> reduces the bill.</p>
+          <button class="btn primary" id="heal">Heal to Full</button>
+        </div>
+      `);
+      $('#heal').onclick = healAll;
+    }
+
+    function renderStocks(){
+      const rows = STOCKS.map(s=>{
+        const have = GS.stocks[s.id]||0;
+        return `<tr>
+          <td>${s.name}</td>
+          <td>${fmt(s.price)}</td>
+          <td>${have}</td>
+          <td style="display:flex; gap:6px; align-items:center">
+            <input type="number" min="1" value="1" id="sq-${s.id}" style="width:86px">
+            <button class="btn" data-buys="${s.id}">Buy</button>
+            <button class="btn" data-sells="${s.id}">Sell</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+      setPanel(`
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="title"><h2>Megacorp Ticker</h2><button class="btn" id="s-refresh">Advance Day</button></div>
+            <table><thead><tr><th>Stock</th><th>Price</th><th>Owned</th><th>Trade</th></tr></thead><tbody>${rows}</tbody></table>
+          </div>
+          <div class="card">
+            <div class="title"><h2>Notes</h2></div>
+            <div class="k">Stocks are legal but volatile. Advancing the day also updates markets city‑wide.</div>
+          </div>
+        </div>
+      `);
+      $('#s-refresh').onclick = ()=>{ advanceDay('market close'); renderStocks(); };
+      $$('#panel [data-buys]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-buys'); const q=parseInt($(`#sq-${id}`).value||'1',10); buyStock(id,q);});
+      $$('#panel [data-sells]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-sells'); const q=parseInt($(`#sq-${id}`).value||'1',10); sellStock(id,q);});
+    }
+
+    // ---------- Character Creation ----------
+    function showCharCreate(){
+      const modal = $('#modal-cc'); modal.style.display='flex';
+      const pointsEl = $('#cc-points'); let points = 5;
+      const base = { strength:5, agility:5, hacking:5, charisma:5, tech:5, health:100 };
+      const cur = {...base};
+
+      function renderAlloc(){
+        pointsEl.textContent = `${points} pts`;
+        const rows = ['strength','agility','hacking','charisma','tech'].map(k=>`
+          <div style="display:flex; align-items:center; gap:8px; margin:6px 0">
+            <div style="width:120px">${k.charAt(0).toUpperCase()+k.slice(1)}</div>
+            <button class="btn" data-down="${k}" ${cur[k]<=1?'disabled':''}>–</button>
+            <div style="min-width:28px; text-align:center">${cur[k]}</div>
+            <button class="btn" data-up="${k}" ${points<=0?'disabled':''}>+</button>
+          </div>`).join('');
+        $('#cc-stats').innerHTML = rows;
+        $$('#cc-stats [data-up]').forEach(b=> b.onclick = ()=>{ const k=b.getAttribute('data-up'); if(points>0){ cur[k]++; points--; renderAlloc(); }});
+        $$('#cc-stats [data-down]').forEach(b=> b.onclick = ()=>{ const k=b.getAttribute('data-down'); if(cur[k]>1){ cur[k]--; points++; renderAlloc(); }});
+      }
+      renderAlloc();
+
+      $('#cc-close').onclick = ()=>{ modal.style.display='none'; };
+      $('#cc-start').onclick = ()=>{
+        GS.name = ($('#cc-name').value.trim()||'Rook');
+        const bg = $('#cc-bg').value;
+        GS.stats = { strength:cur.strength, agility:cur.agility, hacking:cur.hacking, charisma:cur.charisma, tech:cur.tech };
+        BACKGROUND_BONUS[bg]?.(GS.stats);
+        GS.maxHealth = 100 + Math.max(0, GS.stats.strength-5)*2 + (bg==='nomad'?10:0);
+        GS.health = GS.maxHealth;
+        GS.capacity = capacityFromStrength();
+        modal.style.display='none';
+        log(`Welcome, <b>${GS.name}</b>. Background: <b>${bg}</b>.`);
+        renderHUD();
+      };
+    }
+
+    // ---------- Save / Load ----------
+    function saveGame(){
+      const data = JSON.stringify(GS);
+      localStorage.setItem('euphoricdoom.save', data);
+      log('Game saved.', 'good');
+    }
+    function loadGame(){
+      const raw = localStorage.getItem('euphoricdoom.save');
+      if(!raw){ log('No save slot found.', 'bad'); return; }
+      try{
+        const obj = JSON.parse(raw);
+        Object.assign(GS, obj);
+        // ensure integrity after load
+        rollPrices(); renderHUD();
+        log('Loaded save.', 'good');
+        // re‑render current tab
+        const active = document.querySelector('.tab-btn.active')?.dataset.tab || 'trade';
+        render(active);
+      } catch(e){ log('Corrupted save data.', 'bad'); }
+    }
+
+    function newGame(){
+      Object.assign(GS, {
+        day: 1, location: 'market', credits: 1000, health: 100, maxHealth: 100,
+        xp:0, level:1, statPoints:0, name:'Rook', stats:{strength:5,agility:5,hacking:5,charisma:5,tech:5},
+        inventory:{}, prices:{}, capacity:50, debt:0, bank:0, stocks:{}, rumors:[]
+      });
+      triggerRumor(); rollPrices(); renderHUD(); renderTrade(); log('New game started.', 'good'); showCharCreate();
+    }
+
+    // ---------- Generic router ----------
+    function render(tab){
+      $$('#nav .tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===tab));
+      switch(tab){
+        case 'trade': renderTrade(); break;
+        case 'inventory': renderInventory(); break;
+        case 'map': renderMap(); break;
+        case 'character': renderCharacter(); break;
+        case 'quests': renderQuests(); break;
+        case 'bank': renderBank(); break;
+        case 'hospital': renderHospital(); break;
+        case 'stocks': renderStocks(); break;
+        default: renderTrade();
+      }
+    }
+
+    // ---------- Game Over (soft) ----------
+    function gameOver(reason){
+      log(`<b>Game Over</b> — ${reason}`, 'bad');
+    }
+
+    // ---------- Boot ----------
+    function boot(){
+      // Wire nav
+      $$('#nav .tab-btn[data-tab]').forEach(b=> b.addEventListener('click', ()=> render(b.dataset.tab) ));
+      $('#btn-help').onclick = ()=>{ $('#modal-help').style.display='flex'; };
+      $$('[data-close]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-close'); document.getElementById(id).style.display='none'; });
+      $('#btn-save').onclick = saveGame;
+      $('#btn-load').onclick = loadGame;
+      $('#btn-new').onclick = newGame;
+
+      // Initial state
+      triggerRumor();
+      rollPrices();
+      renderHUD();
+      render('trade');
+      showCharCreate();
+
+      // Quality of life: Close modals when clicking backdrop
+      $$('.modal').forEach(m=> m.addEventListener('click', (e)=>{ if(e.target===m) m.style.display='none'; }));
+
+      log('Welcome to EuphoricDoom. Trade smart, stay alive.');
+    }
+
+    document.addEventListener('DOMContentLoaded', boot);
+  })();
+  </script>
+</body>
+</html>
