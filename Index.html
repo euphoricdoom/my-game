@@ -1,826 +1,2116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>EuphoricDoom — Cyberpunk Trading Simulator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EuphoricDoom — Roguelite Economic Adventure (Dynamic Market)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Rubik+Mono+One&display=swap" rel="stylesheet">
+  <!-- Inline SVG favicon (cyberpunk neon chip) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23ff2d95'/%3E%3Cstop offset='1' stop-color='%2300e3ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='10' fill='%23060a16'/%3E%3Cpath d='M20 16h24v32H20z' fill='url(%23g)' opacity='0.95'/%3E%3Cpath d='M28 24h8v4h-8z' fill='%23010a0f'/%3E%3Ccircle cx='44' cy='20' r='3' fill='%23fff' opacity='0.9'/%3E%3C/svg%3E" />
   <style>
-    :root {
-      --bg0: #0a0f14;
-      --bg1: #0f1720;
-      --panel: #121a24cc;
-      --neon: #00ffc8;
-      --neon2: #9d4dff;
-      --text: #dffaf4;
-      --warn: #ff5c7a;
-      --good: #70ffa7;
-      --gold: #ffd166;
+    :root{
+      /* Cyberpunk 2025 neon palette */
+      --bg: #07060a;        /* near-black */
+      --panel: rgba(10,12,18,0.6);
+      --fg: #cfefff;        /* pale cyan */
+      --muted: #98c6d9;
+      --accent: #ff2d95;    /* neon pink */
+      --accent2: #00e3ff;   /* neon cyan */
+      --glow: rgba(0,227,255,0.14);
+      --good: #7ee787; --bad:#ff6b81; --warn:#ffd166;
     }
+    html,body{height:100%}
+  body{background: radial-gradient(circle at 10% 10%, rgba(0,227,255,0.04), transparent 8%), linear-gradient(180deg,var(--bg) 0%, #050407 100%); color:var(--fg); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; font-size:14px; line-height:1.45;}
+  body, .glass, .btn, input, .tag { letter-spacing:0.3px; }
+  .glass{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);backdrop-filter: blur(6px);}
+  .btn, .tag, input.qty { -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  /* Make windows/panels scrollable */
+  .glass, #panel { max-height: 60vh; overflow:auto; }
+  /* Neon glass treatment */
+  .glass{ background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(0,227,255,0.08); box-shadow: 0 6px 30px rgba(0,0,0,0.6), 0 0 18px rgba(102,13,78,0.02) inset; border-radius:14px }
+  .glass:hover{ box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 30px var(--glow); }
+  /* Locking modal content */
+  .modal-content{ max-height: 80vh; overflow:auto; }
+  html.locked, body.locked{ overflow: hidden; height: 100%; }
+    .btn{border:1px solid rgba(255,255,255,0.06); padding:.45rem .8rem; border-radius:.6rem; background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); color:var(--fg);}
+    .btn:hover{ box-shadow:0 0 18px rgba(255,45,149,0.12), 0 0 8px rgba(0,227,255,0.08); border-color: rgba(255,45,149,0.6)}
+    .tag{border:1px dashed rgba(255,255,255,.06); padding:.12rem .45rem; border-radius:.35rem}
+    .log-good{color:var(--good)}
+    .log-bad{color:var(--bad)}
+    .log-warn{color:var(--warn)}
+    .tab-active{border-color:var(--accent); color:var(--accent)}
+  input.qty{background:transparent; border:1px solid rgba(255,255,255,0.12); padding:.15rem .35rem; border-radius:.35rem; color:var(--fg);}
+  table{width:100%; border-collapse: collapse;}
+  th,td{padding:.3rem .35rem; border-bottom:1px dashed rgba(255,255,255,.06); vertical-align: top;}
+    .kbd{border:1px solid rgba(255,255,255,.15); padding:0 .35rem; border-radius:.35rem; font-size:.8rem}
+  #errorOverlay{position:fixed; inset:0; background:linear-gradient(180deg, rgba(3,3,6,0.9), rgba(0,0,0,0.95)); color:#fff; padding:16px; z-index:9999; display:none; overflow:auto; font-family: Inter, system-ui, Arial;}
+  #errorOverlay pre{white-space:pre-wrap}
+  /* HUD controls: autosave indicator and fullscreen */
+  #hud-controls{display:inline-flex; align-items:center; gap:0.5rem; margin-left:0.75rem}
+  #autosave-indicator{width:12px; height:12px; border-radius:50%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); box-shadow:0 0 0 rgba(255,255,255,0); transition:all .18s ease}
+  #autosave-indicator.pulse{ background:linear-gradient(90deg,var(--accent),var(--accent2)); box-shadow:0 0 12px rgba(255,45,149,0.12), 0 0 24px rgba(0,227,255,0.08); transform:scale(1.18) }
+  @keyframes autosave-pulse{ 0%{transform:scale(1)}50%{transform:scale(1.18)}100%{transform:scale(1)} }
+  .fs-btn{ padding:.25rem .5rem; font-size:0.9rem }
 
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      background: radial-gradient(1200px 800px at 20% 0%, #0c1520 0%, var(--bg0) 45%, #06090d 100%),
-                  linear-gradient(135deg, #0a0f16 0%, #0a0f14 100%);
-      color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
-      letter-spacing: 0.2px;
+  /* Buttons & inputs */
+  .btn{ transition: all .16s cubic-bezier(.2,.8,.2,1); }
+  button[disabled]{ opacity:0.45; cursor:not-allowed }
+  .btn:active{ transform:translateY(1px) }
+  input.qty{ border-color: rgba(0,227,255,0.06); padding:.28rem .5rem }
+  .tab-active{ box-shadow: 0 6px 20px rgba(0,227,255,0.04) }
+
+  /* Header neon title */
+  header h1{ font-family: 'Rubik Mono One', 'Inter', sans-serif; letter-spacing:0.4px; color:var(--fg); text-shadow: 0 0 8px rgba(0,227,255,0.06), 0 0 18px rgba(255,45,149,0.04); font-size:1.45rem }
+  header .text-sky-300{ color: linear-gradient(90deg,var(--accent),var(--accent2)); }
+  header h1::after{ content:''; display:block; height:3px; width:40%; margin-top:.3rem; background:linear-gradient(90deg,var(--accent),var(--accent2)); box-shadow:0 6px 24px rgba(0,227,255,0.06); animation:underlinePulse 2.5s infinite; border-radius:3px }
+  @keyframes underlinePulse{ 0%{opacity:0.6}50%{opacity:1}100%{opacity:0.6} }
+
+  /* Modal transitions */
+  .fixed.inset-0{ transition: opacity .18s ease, transform .18s ease }
+  .modal-content{ transition: transform .2s cubic-bezier(.2,.8,.2,1), opacity .18s ease }
+  @keyframes modal-in{ from{ transform:translateY(-8px); opacity:0 } to{ transform:translateY(0); opacity:1 } }
+  button:focus{ outline:2px solid rgba(0,227,255,0.12); outline-offset:2px }
+  /* Price volatility flash */
+  .price-up{ color:#b6ffcf; text-shadow:0 0 8px rgba(126,231,135,0.12); animation:priceFlashUp .9s ease; }
+  .price-down{ color:#ffd6d6; text-shadow:0 0 8px rgba(255,107,129,0.12); animation:priceFlashDown .9s ease; }
+  @keyframes priceFlashUp{ 0%{transform:translateY(-2px) scale(1.02)}50%{transform:translateY(0) scale(1)}100%{transform:translateY(0) scale(1)} }
+  @keyframes priceFlashDown{ 0%{transform:translateY(2px) scale(1.02)}50%{transform:translateY(0) scale(1)}100%{transform:translateY(0) scale(1)} }
+
+  /* Heat gauge */
+  #heat-gauge-wrap{ display:inline-flex; align-items:center; gap:0.5rem; margin-right:0.5rem }
+  #heat-gauge{ width:140px; height:10px; background:rgba(255,255,255,0.03); border-radius:999px; overflow:hidden; border:1px solid rgba(255,255,255,0.03)}
+  #heat-fill{ height:100%; width:0%; background: linear-gradient(90deg, #ffa03b, #ff2d95); box-shadow:0 0 12px rgba(255,45,149,0.06); transition: width .3s ease, box-shadow .2s ease }
+  #heat-gauge.shake{ animation:heatShake .36s ease-in-out; }
+  @keyframes heatShake{ 0%{transform:translateX(0)}25%{transform:translateX(-3px)}50%{transform:translateX(3px)}75%{transform:translateX(-2px)}100%{transform:translateX(0)} }
+
+  /* Carry bar */
+  .carry-bar{ height:8px; background:rgba(255,255,255,0.03); border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.03); }
+  .carry-fill{ height:100%; width:0%; background:linear-gradient(90deg,#66ffb0,#00e3ff); transition: width .3s ease }
+
+  /* Ticker */
+  .ticker{ overflow:hidden; white-space:nowrap; font-size:0.92rem; color:var(--muted); }
+  .ticker .tick{ display:inline-block; padding-right:3rem; animation:tick-anim linear infinite; }
+  @keyframes tick-anim{ from{ transform:translateX(100%) } to{ transform:translateX(-100%) } }
+
+  /* Damage flash / hit */
+  body.damage-flash::before{ content:''; position:fixed; inset:0; background:linear-gradient(180deg, rgba(255,45,75,0.16), rgba(255,45,75,0.06)); pointer-events:none; mix-blend-mode:screen; animation:damagePulse .36s ease; z-index:9998 }
+  @keyframes damagePulse{ 0%{opacity:1; transform:scale(1.02)}100%{opacity:0; transform:scale(1)} }
+
+  /* Event / encounter panel */
+  .event-card{ width:100%; max-width:720px; background:linear-gradient(180deg, rgba(10,12,18,0.98), rgba(3,3,6,0.98)); border:1px solid rgba(0,227,255,0.06); box-shadow:0 20px 60px rgba(0,0,0,0.6); border-radius:12px; padding:1rem }
+  .event-art{ width:100%; height:140px; background:linear-gradient(90deg, rgba(255,45,149,0.06), rgba(0,227,255,0.04)); border-radius:8px; margin-bottom:.6rem; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.6) }
+  .encounter-sil{ width:120px; height:120px; opacity:0.9 }
+  /* Table & row micro-interactions */
+  table thead th{ background: linear-gradient(90deg, rgba(0,227,255,0.02), rgba(255,45,149,0.02)); }
+  table tbody tr:hover{ transform:translateY(-2px); background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(0,227,255,0.01)); box-shadow:0 8px 30px rgba(0,0,0,0.45); }
+  table tbody tr{ transition: all .14s ease; }
+
+  /* Button icon + tooltip */
+  .btn{ position:relative }
+  .btn[data-icon]::before{ content: attr(data-icon); display:inline-block; margin-right:.45rem; opacity:0.95; font-weight:600 }
+  [data-tooltip]:hover::after{ content: attr(data-tooltip); position:absolute; left:50%; transform:translateX(-50%); bottom:calc(100% + 8px); background:rgba(0,0,0,0.7); color:var(--fg); padding:6px 8px; border-radius:6px; font-size:12px; white-space:nowrap; box-shadow:0 6px 18px rgba(0,0,0,0.6); z-index:999 }
+  [data-tooltip]::after{ opacity:0; transition:opacity .12s ease; pointer-events:none }
+  [data-tooltip]:hover::after{ opacity:1 }
+
+  /* Log micro-copy */
+  #log div{ padding:.35rem .5rem; border-radius:8px; background:linear-gradient(90deg, rgba(255,255,255,0.01), rgba(0,227,255,0.01)); }
+  #log .log-good{ background:linear-gradient(90deg, rgba(34,62,36,0.12), rgba(46,84,57,0.06)); }
+  #log .log-bad{ background:linear-gradient(90deg, rgba(62,30,30,0.12), rgba(84,38,38,0.06)); }
+    /* Ambient smoke */
+    #ambient-smoke{ position:fixed; inset:0; pointer-events:none; z-index:3; mix-blend-mode:overlay; opacity:0.26 }
+    #ambient-smoke::before, #ambient-smoke::after{ content:''; position:absolute; left:-10%; top:-20%; width:120%; height:140%; background:radial-gradient(ellipse at 20% 20%, rgba(255,255,255,0.02), transparent 20%), radial-gradient(ellipse at 80% 80%, rgba(0,227,255,0.02), transparent 20%); transform:translateY(-10%); animation:smoke-move 28s linear infinite; }
+    #ambient-smoke::after{ animation-duration:46s; opacity:0.7 }
+    @keyframes smoke-move{ 0%{transform:translateX(0) translateY(0)}50%{transform:translateX(-6%) translateY(4%)}100%{transform:translateX(0) translateY(0)} }
+
+    /* HUD glitch subtle */
+    #hud-line2.glitch{ animation:glitch .9s infinite linear; }
+    @keyframes glitch{ 0%{transform:translateX(0)}20%{transform:translateX(-1px)}40%{transform:translateX(1px)}60%{transform:translateX(-0.5px)}80%{transform:translateX(0.5px)}100%{transform:translateX(0)} }
+
+    /* Illegal flicker when cops nearby */
+    .illegal-row{ transition: box-shadow .18s ease, border .18s ease }
+    .illegal-row.illegal-flicker{ box-shadow:0 0 18px rgba(255,80,80,0.12), inset 0 0 8px rgba(255,30,60,0.04); border-left:3px solid rgba(255,30,60,0.28); animation:illegalPulse 1s infinite alternate }
+    @keyframes illegalPulse{ from{ box-shadow:0 0 8px rgba(255,80,80,0.06)} to{ box-shadow:0 0 28px rgba(255,80,80,0.16)} }
+
+    /* Reduced motion helper */
+    .reduced-motion #ambient-smoke, .reduced-motion .ticker .tick{ animation-play-state:paused !important; opacity:0.12 }
+
+    /* Motion toggle button */
+    .motion-btn{ padding:.25rem .5rem; font-size:0.85rem }
+    /* HUD frame wrapper using external asset if present, fallback to subtle SVG */
+    .hud-wrap{ position:relative; }
+    .hud-frame{ position: absolute; inset:0; pointer-events:none; background-size:contain; background-repeat:no-repeat; background-position:center top; opacity:0.95; mix-blend-mode:screen; z-index:1 }
+    .panel-hud{ position:relative; z-index:2 }
+    /* Embedded HUD SVG (data-URI) */
+    .hud-frame{ background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 300'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='%2300e3ff'/><stop offset='1' stop-color='%23ff2d95'/></linearGradient></defs><rect width='1200' height='300' rx='18' fill='%2305070a' opacity='0.55'/><g stroke='url(%23g)' stroke-width='3' fill='none' opacity='0.48' stroke-linecap='round' stroke-linejoin='round'><path d='M40 70h200 M960 70h200'/><rect x='28' y='28' width='1144' height='244' rx='14'/><path d='M70 150c80-10 160-10 240 0 80 10 160 10 240 0 80-10 160-10 240 0 80 10 160 10 240 0' opacity='0.18'/></g><g opacity='0.12' fill='url(%23g)'><rect x='70' y='40' width='140' height='22' rx='6'/><rect x='990' y='40' width='140' height='22' rx='6'/></g></svg>"); background-size:cover; }
+    /* Responsive shell tweaks */
+    #shell-hud{ height:64px; }
+    @media (max-width: 900px){
+      #shell-nav{ display:none; }
+      #shell-hud{ padding:0.5rem 0.85rem; height:64px; }
+      #main-wrap{ padding-top:0; }
+      .hud-wrap .panel-hud{ max-height: calc(100vh - 140px); }
+      /* mobile bottom nav strip */
+      #mobile-nav{ display:flex; gap:6px; justify-content:space-around; position:fixed; left:0; right:0; bottom:8px; z-index:60; padding:6px 8px; }
+      #toast-container{ right:8px; top:84px; }
     }
-
-    /* Neon utility */
-    .glow { text-shadow: 0 0 6px var(--neon), 0 0 14px var(--neon2); }
-    .ring { box-shadow: 0 0 0 1px #00ffc833, 0 0 18px #00ffc822 inset, 0 0 28px #9d4dff22 inset, 0 0 32px #00ffc811; }
-
-    /* Layout */
-    #app { display: grid; grid-template-rows: auto auto 1fr auto; min-height: 100dvh; }
-    header {
-      padding: 14px 16px; position: sticky; top: 0; z-index: 10;
-      background: linear-gradient(180deg, #0d1420, #0b1018 55%, transparent);
-      border-bottom: 1px solid #0ef2c922;
+    @media (min-width: 901px){
+      #main-wrap{ padding-top:8px; }
+      #mobile-nav{ display:none; }
     }
-    header h1 { margin: 0; font-weight: 700; font-size: clamp(18px, 3.2vw, 26px); }
-    header small { color: #9ad9cc; }
-
-    #hud {
-      display: grid; gap: 8px; padding: 12px 16px; align-items: center;
-      grid-template-columns: repeat(2, minmax(0,1fr));
-      border-bottom: 1px solid #0ef2c922; background: #0a121a77; backdrop-filter: blur(6px);
-    }
-    @media (min-width: 800px) { #hud { grid-template-columns: repeat(6, minmax(0,1fr)); } }
-    .chip {
-      background: var(--panel); border: 1px solid #0ef2c922; border-radius: 12px; padding: 8px 10px;
-      display: flex; gap: 8px; align-items: baseline; justify-content: space-between;
-    }
-    .chip b { color: var(--neon); font-weight: 700; }
-
-    /* Nav */
-    #nav { display: grid; grid-auto-flow: column; gap: 8px; padding: 8px 12px; overflow-x: auto; }
-    .tab-btn {
-      white-space: nowrap; border: 1px solid #0ef2c933; background: #0b142033; color: var(--text);
-      border-radius: 999px; padding: 10px 14px; cursor: pointer; transition: transform .08s ease;
-    }
-    .tab-btn.active { background: #0b203033; border-color: #00ffc866; box-shadow: 0 0 18px #00ffc81f inset; }
-    .tab-btn:active { transform: translateY(1px); }
-
-    /* Panels */
-    #panel { padding: 12px; }
-    .card { background: var(--panel); border: 1px solid #0ef2c933; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
-    .title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom: 8px; }
-    .title h2 { margin:0; font-size: 16px; }
-
-    .grid { display: grid; gap: 10px; }
-    @media (min-width: 900px) { .grid.cols-2 { grid-template-columns: 1.2fr 1fr; } }
-
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th, td { padding: 8px; border-bottom: 1px solid #0ef2c922; text-align: left; }
-    th { color: #a0f7e7; font-weight: 600; }
-    tr:hover { background: #0f1b26aa; }
-
-    .btn {
-      border: 1px solid #00ffc844; color: var(--text); background: #0e1b26; border-radius: 10px; padding: 8px 10px; cursor: pointer;
-    }
-    .btn:hover { box-shadow: 0 0 10px #00ffc822 inset; }
-    .btn:disabled { opacity: .5; cursor: not-allowed; }
-    .btn.primary { background: linear-gradient(180deg, #0ef2c922, #0ef2c911); border-color: #00ffc877; }
-    .btn.warn { border-color: var(--warn); color: #ffdbe1; }
-
-    input, select { width: 100%; background: #0b131c; border: 1px solid #0ef2c933; color: var(--text); border-radius: 10px; padding: 8px 10px; }
-
-    /* Event Log */
-    #log { height: 26vh; min-height: 160px; overflow: auto; padding: 8px 12px; background: #081018aa; border-top: 1px solid #0ef2c922; }
-    .logline { font-size: 13px; color: #bfeee3; border-left: 2px solid #0ef2c966; padding-left: 8px; margin: 6px 0; }
-    .logline .t { color: #6ee7cf; }
-    .logline.bad { border-color: var(--warn); color: #ffc8d2; }
-    .logline.good { border-color: var(--good); color: #c2ffd8; }
-
-    /* Modal */
-    .modal { position: fixed; inset: 0; background: #000000cc; display: none; align-items: center; justify-content: center; padding: 12px; }
-    .modal .inner { width: min(980px, 100%); max-height: 88vh; overflow: auto; background: var(--panel); border: 1px solid #0ef2c933; border-radius: 16px; padding: 16px; }
-
-    .pill { display:inline-block; padding:2px 8px; border:1px solid #00ffc866; border-radius:999px; font-size:12px; color:#9feee0; }
-    .k { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: #9ad9cc; }
-  
-/* === Responsive Scaling Additions === */
-#app { width: min(100%, 1280px); margin: 0 auto; }
-header, #hud, #nav, #panel { max-width: 100%; }
-
-/* Let wide tables scroll on tiny screens instead of blowing up the layout */
-#panel { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; }
-
-/* Collapse two-column layouts to one column on narrow viewports */
-@media (max-width: 900px) {
-  .grid.cols-2 { grid-template-columns: 1fr; }
-}
-
-/* Tighten spacing and font size on small devices */
-@media (max-width: 700px) {
-  body { font-size: 14px; }
-  .tab-btn { padding: 8px 10px; }
-  th, td { padding: 6px; }
-  header h1 { font-size: clamp(16px, 5vw, 22px); }
-  #hud { grid-template-columns: repeat(2, minmax(0,1fr)); }
-}
-
-</style>
+    </style>
+  <script>
+    // Ensure global save version and ED namespace exist before any script runs
+    window.SAVE_VERSION = window.SAVE_VERSION || 3;
+    window.ED = window.ED || {};
+  </script>
 </head>
-<body>
-  <div id="app">
-    <header class="ring">
-      <h1 class="glow">EuphoricDoom <small>— Cyberpunk Trading Simulator</small></h1>
-      <div class="k">Turn‑based • Single file • Mobile friendly</div>
+<body class="min-h-full">
+  <div id="ambient-smoke" aria-hidden="true"></div>
+  <div id="errorOverlay"><h2 class="text-xl mb-2">Runtime error</h2><pre id="errorText"></pre></div>
+
+  <!-- Application shell: sticky HUD (top) + left nav + main content -->
+  <div id="app-shell" class="min-h-screen">
+  <header id="shell-hud" role="banner" aria-label="Game status HUD" class="fixed top-0 left-0 right-0 z-40 glass p-3 flex items-center justify-between" style="backdrop-filter: blur(6px);">
+      <div class="flex items-center gap-3">
+        <div style="min-width:44px; height:44px; border-radius:8px; background:linear-gradient(90deg,var(--accent),var(--accent2)); opacity:0.12; display:flex; align-items:center; justify-content:center; font-weight:700;">ED</div>
+        <div>
+          <div class="text-sm font-semibold">EuphoricDoom — Roguelite Economic Adventure</div>
+          <div class="text-xs text-sky-200/70">GTA energy, roguelite soul: dynamic markets, heat, legacy.</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+  <div id="hud-line1" class="text-sm" aria-live="polite" aria-atomic="true"></div>
+  <div id="hud-line2" class="text-sm text-sky-200/80" aria-live="polite" aria-atomic="true"></div>
+        <div id="heat-gauge-wrap" style="display:flex;align-items:center">
+          <div id="heat-gauge"><div id="heat-fill"></div></div>
+        </div>
+        <div style="width:140px">
+          <div class="carry-bar"><div class="carry-fill"></div></div>
+        </div>
+        <div id="hud-controls">
+          <div id="autosave-indicator" title="Autosave status"></div>
+          <button id="fs-toggle" class="btn fs-btn" title="Toggle Fullscreen">⤢</button>
+          <button id="settings-toggle" class="btn fs-btn" title="Settings">⚙</button>
+          <button id="motion-toggle" class="btn motion-btn" title="Toggle Motion">Motion</button>
+        </div>
+      </div>
     </header>
 
-    <section id="hud">
-      <div class="chip"><span>Location</span><b id="hud-location">—</b></div>
-      <div class="chip"><span>Day</span><b id="hud-day">1</b></div>
-      <div class="chip"><span>Credits</span><b id="hud-credits">0</b></div>
-      <div class="chip"><span>Health</span><b id="hud-health">100</b></div>
-      <div class="chip"><span>Capacity</span><b id="hud-capacity">0/0</b></div>
-      <div class="chip"><span>Level</span><b id="hud-level">1</b></div>
-    </section>
+    <div class="flex pt-20 max-w-6xl mx-auto p-4">
+      <aside id="shell-nav" class="w-44 mr-4 hidden md:block">
+  <nav id="left-nav" class="flex flex-col gap-2 sticky top-20" role="tablist" aria-orientation="vertical" aria-label="Primary navigation">
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="trade">Trade</button>
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="travel">Travel</button>
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="store">Store</button>
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="bank">Bank</button>
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="hospital">Hospital</button>
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="character">Character</button>
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="hub">Meta Hub</button>
+          <button role="tab" aria-selected="false" aria-controls="panel" class="tab btn text-left" data-tab="contracts">Contracts</button>
+          <div class="mt-4">
+            <button id="newrun" class="btn">New Run</button>
+          </div>
+          <div class="mt-2 flex gap-2">
+            <button id="save" class="btn">Save</button>
+            <button id="load" class="btn">Load</button>
+          </div>
+        </nav>
+      </aside>
 
-    <nav id="nav">
-      <button class="tab-btn active" data-tab="trade">Trade</button>
-      <button class="tab-btn" data-tab="inventory">Inventory</button>
-      <button class="tab-btn" data-tab="map">Travel</button>
-      <button class="tab-btn" data-tab="character">Character</button>
-      <button class="tab-btn" data-tab="quests">Quests</button>
-      <button class="tab-btn" data-tab="bank">Bank</button>
-      <button class="tab-btn" data-tab="hospital">Hospital</button>
-      <button class="tab-btn" data-tab="stocks">Stocks</button>
-      <span style="flex:1"></span>
-      <button class="tab-btn" id="btn-save">Save</button>
-      <button class="tab-btn" id="btn-load">Load</button>
-      <button class="tab-btn" id="btn-new">New Game</button>
-      <button class="tab-btn" id="btn-help">Help</button>
-    </nav>
-
-    <main id="panel">
-      <!-- Panels rendered here -->
-    </main>
-
-    <section id="log"></section>
-  </div>
-
-  <!-- Character Creation Modal -->
-  <div class="modal" id="modal-cc">
-    <div class="inner">
-      <div class="title"><h2>New Runner Setup</h2><button class="btn" id="cc-close">Skip</button></div>
-      <div class="grid cols-2">
-        <div class="card">
-          <div class="title"><h2>Identity</h2></div>
-          <label>Name<input id="cc-name" placeholder="Handle" maxlength="24"></label>
-          <div style="height:10px"></div>
-          <label>Background
-            <select id="cc-bg">
-              <option value="street">Street Kid (+2 Agility, +1 Charisma)</option>
-              <option value="corp">Ex‑Corp (+2 Tech, +1 Charisma)</option>
-              <option value="nomad">Nomad (+2 Strength, +10 Health)</option>
-            </select>
-          </label>
-          <div class="k" style="margin-top:6px">Backgrounds grant starting bonuses.</div>
+  <main id="main-wrap" class="flex-1">
+        <div class="flex justify-end mb-3">
+          <button id="run-smoke" class="btn">Run Smoke</button>
+          <button id="export-save" class="btn">Export Save</button>
+          <button id="import-save" class="btn">Import Save</button>
+          <button id="clear-log" class="btn">Clear Log</button>
         </div>
-        <div class="card">
-          <div class="title"><h2>Allocate Stats <span class="pill" id="cc-points">5 pts</span></h2></div>
-          <div id="cc-stats"></div>
-          <div style="height:10px"></div>
-          <button class="btn primary" id="cc-start">Start Run</button>
+
+        <div class="hud-wrap">
+          <div class="hud-frame" id="hud-frame" aria-hidden="true"></div>
+          <section id="panel" role="region" aria-label="Main panel" class="glass rounded-xl p-4 panel-hud"></section>
         </div>
-      </div>
+
+        <section class="glass rounded-xl mt-3 p-3">
+          <div class="font-semibold mb-2">Log</div>
+          <div id="log" role="log" aria-live="polite" aria-atomic="false" class="space-y-1 max-h-64 overflow-auto text-sm"></div>
+        </section>
+
+        <footer class="mt-6 text-xs text-sky-200/60">
+          Controls: <span class="kbd">1</span>-<span class="kbd">8</span> tabs • <span class="kbd">S</span> Save • <span class="kbd">L</span> Load
+        </footer>
+      </main>
     </div>
-  </div>
-
-  <!-- Help Modal -->
-  <div class="modal" id="modal-help">
-    <div class="inner">
-      <div class="title"><h2>How to Play</h2><button class="btn" data-close="modal-help">Close</button></div>
-      <div class="grid">
-        <div class="card">
-          <p>Every major action advances <b>1 day</b>. Buy low, sell high, and dodge heat.</p>
-          <ul>
-            <li><b>Trade:</b> Buy/Sell items. Use <i>Max</i> / <i>Sell All</i>.</li>
-            <li><b>Travel:</b> Move between districts. Random risks.</li>
-            <li><b>Bank / Loan:</b> Park credits or borrow at interest.</li>
-            <li><b>Hospital:</b> Heal damage. Staying alive is profitable.</li>
-            <li><b>Stocks:</b> Gamble on megacorps. Volatile but legal.</li>
-          </ul>
-          <p class="k">Pro tips: Charisma improves prices. Strength raises carry capacity. Agility reduces travel risk.</p>
-        </div>
-      </div>
+    <!-- Mobile bottom nav (visible on narrow screens) -->
+      <div id="mobile-nav" class="hidden md:hidden" role="tablist" aria-orientation="horizontal" aria-label="Mobile navigation">
+      <button role="tab" aria-selected="false" aria-controls="panel" class="btn tab" data-tab="trade">Trade</button>
+      <button role="tab" aria-selected="false" aria-controls="panel" class="btn tab" data-tab="travel">Travel</button>
+      <button role="tab" aria-selected="false" aria-controls="panel" class="btn tab" data-tab="store">Store</button>
+      <button role="tab" aria-selected="false" aria-controls="panel" class="btn tab" data-tab="hub">Hub</button>
+      <button role="tab" aria-selected="false" aria-controls="panel" class="btn tab" data-tab="contracts">Contracts</button>
     </div>
   </div>
 
   <script>
+  // Error overlay
   (function(){
-    'use strict';
-
-    // ---------- Data ----------
-    const ITEMS = [
-      {id:'meds', name:'Synth Meds', base:120, weight:1, cat:'Medical', illegal:false},
-      {id:'chips', name:'Black ICE Chips', base:420, weight:1, cat:'Tech', illegal:true},
-      {id:'dust', name:'Neon Dust', base:260, weight:1, cat:'Contraband', illegal:true},
-      {id:'arms', name:'Smart Pistols', base:560, weight:2, cat:'Weapons', illegal:true},
-      {id:'food', name:'Soy Rations', base:40, weight:1, cat:'Goods', illegal:false},
-      {id:'mods', name:'Street Aug Parts', base:300, weight:2, cat:'Tech', illegal:false},
-      {id:'rare', name:'Quantum Cores', base:900, weight:1, cat:'Exotic', illegal:true},
-    ];
-
-    const DISTRICTS = [
-      {id:'spire', name:'Apex Spire', priceMod:1.15, risk:0.04},
-      {id:'market', name:'Shinjuku Market', priceMod:0.95, risk:0.06},
-      {id:'slums', name:'Chrome Slums', priceMod:0.85, risk:0.09},
-      {id:'docks', name:'Neon Docks', priceMod:1.00, risk:0.05},
-      {id:'arcology', name:'Helix Arcology', priceMod:1.10, risk:0.03},
-    ];
-
-    const STOCKS = [
-      {id:'NX', name:'Nexacore', price: 50},
-      {id:'VL', name:'Viralight', price: 80},
-      {id:'QM', name:'Q‑MagiTek', price: 120},
-    ];
-
-    const BACKGROUND_BONUS = {
-      street: (s)=>{ s.agility+=2; s.charisma+=1; },
-      corp:   (s)=>{ s.tech+=2; s.charisma+=1; },
-      nomad:  (s)=>{ s.strength+=2; s.health+=10; },
+    function showError(msg, src, line, col, err){
+      var overlay = document.getElementById('errorOverlay');
+      var pre = document.getElementById('errorText');
+      var stack = (err && err.stack) ? '\\n'+err.stack : '';
+      pre.textContent = (msg||'Error') + '\\n' + (src||'') + ':' + (line||'?') + ':' + (col||'?') + stack;
+      overlay.style.display='block';
+      return false;
+    }
+    window.onerror = showError;
+    window.onunhandledrejection = function(e){
+      var reason = e && e.reason ? (e.reason.stack || e.reason) : e;
+      showError('Unhandled promise rejection', '', '', '', {stack:String(reason)});
     };
 
-    // ---------- State ----------
-    const GS = {
-      day: 1,
-      location: 'market',
-      credits: 1000,
-      health: 100,
-      maxHealth: 100,
-      xp: 0,
-      level: 1,
-      statPoints: 0,
-      name: 'Rook',
-      stats: { strength:5, agility:5, hacking:5, charisma:5, tech:5 },
-      inventory: {}, // id -> qty
-      prices: {}, // itemId -> price at current district
-      capacity: 50, // weight limit
-      debt: 0,
-      bank: 0,
-      stocks: {}, // stockId -> shares
-      rumors: [], // recent price events
-    };
+    
+  })();
+  </script>
 
-    // ---------- Utilities ----------
-    const $ = sel => document.querySelector(sel);
-    const $$ = sel => Array.from(document.querySelectorAll(sel));
-    const fmt = n => n.toLocaleString(undefined, {maximumFractionDigits:0});
-    const rand = (a,b)=> Math.random()*(b-a)+a;
-    const clamp = (v, a, b)=> Math.max(a, Math.min(b, v));
+  <script>
+    // Global save version and ED export helper (ensure defined before runtime uses)
+    var SAVE_VERSION = window.SAVE_VERSION || 3;
+    window.ED = window.ED || {};
+    function getSaveVersion(){ return (typeof window !== 'undefined' && window.SAVE_VERSION) ? window.SAVE_VERSION : 3; }
 
-    function log(msg, type=''){
-      const el = document.createElement('div');
-      el.className = `logline ${type}`;
-      const t = new Date().toLocaleTimeString();
-      el.innerHTML = `<span class="t">[${t}]</span> ${msg}`;
-      $('#log').prepend(el);
+    function exportED(){
+      try{
+        window.ED.GS = GS;
+        window.ED.META = META;
+        window.ED.CONFIG = CONFIG;
+        window.ED.saveVersion = getSaveVersion();
+        window.ED.sync = function(){ window.ED.GS = GS; window.ED.META = META; };
+      }catch(_e){}
     }
 
-    function invWeight(){
-      let w=0; for(const id in GS.inventory){ const item = ITEMS.find(i=>i.id===id); w += (item?.weight||0) * GS.inventory[id]; }
-      return w;
-    }
+    // ------------------ CONFIG ------------------
+    var CONFIG = {
+      baseCapacity: 15,
+      vol: 0.18,  // retained for news volatility
+      eventDailyChance: 0.15,
+      // Market knobs
+      market: {
+        baselineStock: 20,         // base stock per item per district
+        restockRate: 0.35,         // fraction of gap to baseline restored per day
+        driftVol: 0.06,            // daily drift up/down
+        spread: 0.12,              // bid/ask spread
+        tax: 0.06,                 // fence/market cut on sells
+        impact: 0.05,              // price impact per unit as fraction of base
+        illegalFenceCut: 0.10,     // extra sell cut for illegal goods without a fence
+        maxUnitsPerClick: 1
+      },
+      items: [
+        {id:'wire', name:'Copper Wire', base:24,  weight:1, illegal:false, desc:'Basic conductive spool used in cheap electronics and street mods.'},
+        {id:'med',  name:'Street Meds', base:110, weight:1, illegal:true, desc:'Unregulated meds — potent but risky. High demand in risky districts.'},
+        {id:'chip', name:'Memory Chip', base:65,  weight:1, illegal:false, desc:'A small computing module used in consumer and industrial hardware.'},
+        {id:'nano', name:'Nanogel',     base:210, weight:1, illegal:true, desc:'Advanced nanotech gel used in cybernetic repairs — tightly controlled.'},
+        {id:'tea',  name:'Synth Tea',   base:16,  weight:1, illegal:false, desc:'Comfort beverage popular with long-haul drivers and night-shift labor.'},
+        {id:'cap',  name:'Caps',        base:45,  weight:1, illegal:false, desc:'Small electronic caps used in quick-fix circuits and bartering.'},
 
-    function capacityFromStrength(){
-      return 40 + GS.stats.strength * 2; // scales with strength
-    }
-
-    function priceWithCharisma(base){
-      // Charisma gives up to ~10% discount at 15+ charisma, penalty if very low
-      const c = GS.stats.charisma;
-      const adj = (c-5) * 0.01; // -5%..+10%
-      return Math.max(1, Math.round(base * (1 - clamp(adj, -0.10, 0.10))));
-    }
-
-    // ---------- Economy ----------
-    function rollPrices(){
-      GS.prices = {};
-      const district = DISTRICTS.find(d=>d.id===GS.location);
-      ITEMS.forEach(it=>{
-        const vol = rand(0.75, 1.35); // daily volatility
-        const rumor = GS.rumors.find(r=> r.item===it.id);
-        const rumorMod = rumor ? rumor.mult : 1;
-        const p = Math.max(4, Math.round(it.base * district.priceMod * vol * rumorMod));
-        GS.prices[it.id] = p;
-      });
-    }
-
-    function triggerRumor(){
-      GS.rumors = GS.rumors.filter(r=> (GS.day - r.day) <= rand(2,4)); // drop old
-      if(Math.random() < 0.35){
-        const pick = ITEMS[Math.floor(Math.random()*ITEMS.length)];
-        const mult = Math.random() < 0.5 ? rand(1.3,1.9) : rand(0.55,0.8);
-        GS.rumors.push({ item: pick.id, mult, day: GS.day });
-        log(`<b>Market rumor</b>: ${pick.name} ${(mult>1? 'surges':'crashes')}!`, mult>1?'good':'bad');
+        // New trade goods
+        {id:'battery', name:'EV Battery Cell', base:320, weight:3, illegal:false, desc:'High-energy cells used in personal vehicles and small rigs.'},
+        {id:'silk', name:'Synth Silk', base:90, weight:1, illegal:false, desc:'Synthetic fabric demanded by mid-tier fashion houses.'},
+        {id:'crypto_key', name:'Encrypted Key', base:560, weight:0, illegal:true, desc:'Black-market key granting temporary access to paynodes.'},
+        {id:'holo', name:'Holo Display', base:180, weight:1, illegal:false, desc:'Compact holo modules used in AR signage and entertainment.'},
+        {id:'nano_filament', name:'Nano Filament', base:420, weight:1, illegal:true, desc:'Precision filament for medical printers; illegal in some sectors.'},
+        {id:'drug_bundle', name:'Designer Bundle', base:260, weight:1, illegal:true, desc:'A curated set of designer chems — very profitable but risky.'}
+      ],
+      districts: [
+        {id:'slags', name:'The Slags',        priceMod:0.9,  risk:0.16, desc:'A scrapyard district where scavenged goods and labor are cheap.'},
+        {id:'spire', name:'Corporate Spire',  priceMod:1.1,  risk:0.10, desc:'Wealthy corporate sector — higher prices but lower street-level risk.'},
+        {id:'dock',  name:'Night Docks',      priceMod:1.0,  risk:0.20, desc:'Shipping and smuggling hub; expect opportunistic encounters.'},
+        {id:'baz',   name:'Neon Bazaar',      priceMod:1.05, risk:0.14, desc:'Busy open market with eclectic demand and niche buyers.'}
+      ],
+      events: [
+        {id:'ban',   label:'Police crackdown on contraband', affects:{illegal:0.25}, duration:2},
+        {id:'short', label:'Supply shortfall in components', affects:{chip:0.35},   duration:3},
+        {id:'spill', label:'Tainted meds scare',             affects:{med:-0.20},   duration:2}
+      ],
+      store: {
+        weapons: [
+          {id:'knife', name:'Carbon Knife', cost:250, dmg:4},
+          {id:'pistol', name:'Street Pistol', cost:800, dmg:8},
+          {id:'smg', name:'Compact SMG', cost:1800, dmg:12}
+        ],
+        armor: [
+          {id:'leather', name:'Reinforced Jacket', cost:300, dr:1},
+          {id:'kevlar', name:'Kevlar Vest', cost:1200, dr:3},
+          {id:'tac', name:'Tactical Rig', cost:2400, dr:5}
+        ],
+        gear: [
+          {id:'sling', name:'Sling Pack', cost:200, cap:10},
+          {id:'ruck',  name:'Rucksack',   cost:600, cap:25},
+          {id:'exo',   name:'Exo Harness',cost:2000, cap:60}
+        ],
+        vehicles: [
+          {id:'scoot', name:'Rusty Scooter', cost:900, travelRisk:-0.02},
+          {id:'sedan', name:'Grey Sedan',    cost:3000, travelRisk:-0.04},
+          {id:'hyper', name:'Hyperbike',     cost:9000, travelRisk:-0.08}
+        ],
+        property: [
+          {id:'capsule', name:'Capsule Pod', cost:2000, stash:50},
+          {id:'flat',    name:'Lowrise Flat',cost:8000, stash:200},
+          {id:'pent',    name:'Spire Penthouse', cost:30000, stash:1000}
+        ],
+        lux: [
+          {id:'watch', name:'Status Chrono', cost:1200, charisma:1},
+          {id:'ring',  name:'Signal Ring',   cost:4500, charisma:2}
+        ]
+      },
+      encounters: [
+        {id:'rival',  label:'Rival gang demands tribute', weight:4},
+        {id:'cops',   label:'Enforcers spot-check',       weight:3},
+        {id:'mugger', label:'Mugger in an alley',         weight:2},
+        {id:'hazard', label:'Transit hazard',             weight:1}
+      ],
+      backgrounds: {
+        Drifter:{desc:'Balanced nobody from nowhere.', start:{credits:500, stats:{strength:2, agility:2, charisma:1, luck:1}}},
+        Smuggler:{desc:'Knows routes. Loves risk.',     start:{credits:600, stats:{strength:2, agility:2, charisma:1, luck:2}, perks:{cap:+5}}},
+        ExCop:{desc:'Knows the law. Hated by gangs.',   start:{credits:550, stats:{strength:2, agility:3, charisma:1, luck:1}, perks:{copRun:+0.1}}},
+        Broker:{desc:'Silver tongue. Thin skin.',       start:{credits:700, stats:{strength:1, agility:2, charisma:3, luck:1}}}
+      },
+      augments: {
+        OcularHUD:{desc:'+1 Luck (rare finds).', apply:function(gs){ gs.stats.luck+=1; }},
+        MuscleWeave:{desc:'+1 Strength (carry/damage).', apply:function(gs){ gs.stats.strength+=1; }},
+        ReflexChip:{desc:'+1 Agility (escape/defense).', apply:function(gs){ gs.stats.agility+=1; }}
       }
-    }
+    };
 
-    function advanceDay(reason=''){
-      GS.day += 1;
-      // Interest / debt growth
-      if(GS.debt>0){ const r = 0.03 - Math.min(0.02, GS.stats.hacking*0.001); const add = Math.ceil(GS.debt * r); GS.debt += add; log(`Loan interest accrued: <b>${fmt(add)}</b> cr.`, 'bad'); }
-      // Bank interest (low)
-      if(GS.bank>0){ const add = Math.floor(GS.bank * 0.002); GS.bank += add; if(add>0) log(`Bank interest: +<b>${fmt(add)}</b> cr.`, 'good'); }
-      // Stocks random walk
-      STOCKS.forEach(s=>{ const drift = rand(-0.09,0.12); s.price = Math.max(1, Math.round(s.price * (1+drift))); });
-      // Travel/event risks happen after travel specifically (handled in travelTo)
-      triggerRumor();
-      rollPrices();
-      renderHUD();
-      if(reason) log(`<i>Day advances</i> — ${reason}`);
-    }
+    // ------------------ META ------------------
+    var META = {
+      legacyPoints: 0,
+      codex: {},
+      unlocks: {backgrounds:['Drifter'], augments:[], items:[]},
+      factionRep: {gang:0, cops:0, corps:0},
+      highScore: 0
+    };
+    function loadMeta(){ try{ var raw=localStorage.getItem('ED_SIM_META'); if(raw){ META=Object.assign(META,JSON.parse(raw)); } }catch(e){} }
+    function saveMeta(){ try{ localStorage.setItem('ED_SIM_META', JSON.stringify(META)); }catch(e){} }
 
-    // ---------- Trading ----------
-    function buy(itemId, qty){
-      const price = GS.prices[itemId];
-      const finalPrice = priceWithCharisma(price);
-      const item = ITEMS.find(i=>i.id===itemId);
-      if(!item) return;
-      const maxByMoney = Math.floor(GS.credits / finalPrice);
-      const maxByCapacity = Math.floor((GS.capacity - invWeight()) / item.weight);
-      const canBuy = clamp(qty, 0, Math.min(maxByMoney, maxByCapacity));
-      if(canBuy <= 0) { log(`Cannot buy ${item.name}: insufficient funds or capacity.`, 'bad'); return; }
-      GS.credits -= canBuy * finalPrice;
-      GS.inventory[itemId] = (GS.inventory[itemId]||0) + canBuy;
-      GS.xp += canBuy;
-      levelCheck();
-      log(`Bought <b>${canBuy}</b> × ${item.name} @ <b>${fmt(finalPrice)}</b> each.`, 'good');
-      renderHUD();
-      renderTrade();
-    }
+    // ------------------ STATE ------------------
+    var GS = {};
+    var ACTIVE_TAB = 'trade';
 
-   function sell(itemId, qty){
-      const price = GS.prices[itemId];
-      const finalPrice = Math.round(price * (1 + Math.min(0.10, (GS.stats.charisma-5)*0.01))); // small charisma boost on sell
-      const have = GS.inventory[itemId]||0;
-      const canSell = clamp(qty, 0, have);
-      if(canSell <= 0){ log(`You don't have that many.`, 'bad'); return; }
-      GS.inventory[itemId] = have - canSell;
-      if(GS.inventory[itemId] <= 0) delete GS.inventory[itemId];
-      const gain = canSell * finalPrice;
-      GS.credits += gain;
-      GS.xp += canSell;
-      levelCheck();
-      log(`Sold <b>${canSell}</b> × ${ITEMS.find(i=>i.id===itemId).name} @ <b>${fmt(finalPrice)}</b>.`, 'good');
-      renderHUD();
-      const active = document.querySelector('.tab-btn.active')?.dataset.tab || 'trade';
-      render(active);
-    }
+    function newRun(backgroundName){
+      var bgs = META.unlocks.backgrounds;
+      var chosen = backgroundName || (bgs.length===1 ? bgs[0] : null);
+      if(!chosen){ return showBackgroundPicker(); }
+      var bg = CONFIG.backgrounds[chosen] || CONFIG.backgrounds.Drifter;
 
-    function levelCheck(){
-      const need = GS.level * 100;
-      if(GS.xp >= need){ GS.level++; GS.statPoints++; log(`Level up! You are now <b>Level ${GS.level}</b>. +1 Stat Point.`, 'good'); renderHUD(); renderCharacter(); }
-    }
+      GS = {
+        version: getSaveVersion(),
+        day: 1,
+        location: 'slags',
+        name: 'Runner',
+        background: chosen,
+        hp: 30,
+        credits: bg.start.credits,
+        stats: {strength: bg.start.stats.strength, agility: bg.start.stats.agility, charisma: bg.start.stats.charisma, luck: bg.start.stats.luck},
+        points: 0,
+        inventory: {},
+        prices: {}, // legacy; not used by market calc
+        bank: {balance:0, debt:0},
+        effects: [],
+        locked: false,
+        gear: {weapon:null, armor:null, pack:null, vehicle:null, property:[], lux:[]},
+        heat: 0,
+        stash: {},
+        perks: bg.start.perks || {},
+        market: {},       // per-district market state
+        dailySeed: {},    // district daily drift
+        challenge: {},
+        contracts: {available:[], active:[]}
+      };
 
-    // ---------- Travel & Risks ----------
-    function travelTo(did){
-      if(did === GS.location){ log(`You're already in ${DISTRICTS.find(d=>d.id===did).name}.`); return; }
-      const from = DISTRICTS.find(d=>d.id===GS.location).name;
-      GS.location = did;
-      const d = DISTRICTS.find(d=>d.id===did);
-      // Risk roll (reduced by agility)
-      const risk = Math.max(0.01, d.risk - GS.stats.agility*0.002);
-      let msg = `Traveled from ${from} to <b>${d.name}</b>.`;
-      if(Math.random() < risk){
-        // Event: police shake or ambush
-        const carryingIllegal = Object.keys(GS.inventory).some(id=> ITEMS.find(i=>i.id===id)?.illegal);
-        if(carryingIllegal && Math.random()<0.7){
-          // Fine or injury
-          if(Math.random()<0.5){
-            const fine = Math.min(GS.credits, Math.floor(rand(50,200)));
-            GS.credits -= fine; msg += ` Police shake‑down: lost <b>${fmt(fine)}</b> credits.`; log(msg, 'bad');
-          } else {
-            const dmg = Math.floor(rand(6,18)); GS.health = Math.max(1, GS.health - dmg); msg += ` Street ambush: took <b>${dmg}</b> damage.`; log(msg, 'bad');
-          }
-        } else {
-          const dmg = Math.floor(rand(2,8)); GS.health = Math.max(1, GS.health - dmg); msg += ` Hazards en route: <b>${dmg}</b> damage.`; log(msg, 'bad');
+      // Apply persistent augments
+      for(var i=0;i<META.unlocks.augments.length;i++){
+        var key = META.unlocks.augments[i];
+        if(CONFIG.augments[key] && typeof CONFIG.augments[key].apply==='function'){
+          CONFIG.augments[key].apply(GS);
         }
-      } else {
-        log(msg, 'good');
       }
-      advanceDay('travel');
-      if(GS.health<=0){ gameOver('You succumbed to your wounds while traveling.'); }
-      renderHUD();
-      renderMap();
+
+      initMarket();
+      rollDailyDrift(); // seed day 1
+        generateContracts();
+      logClear();
+      logMessage('New run as '+chosen+'.', 'good');
+      updateUI();
+      saveGame();
+      // Export runtime refs for external tooling / future modules
+      exportED();
     }
 
-    // ---------- Bank & Loans ----------
-    function deposit(amount){
-      amount = Math.floor(amount);
-      if(amount<=0 || amount>GS.credits){ log('Invalid deposit amount.', 'bad'); return; }
-      GS.credits -= amount; GS.bank += amount; log(`Deposited <b>${fmt(amount)}</b> credits.`, 'good'); renderHUD(); renderBank();
+    // ------------------ UTIL ------------------
+    function $(sel){ return document.querySelector(sel); }
+    function elPanel(){ return $('#panel'); }
+    function c(n){ try{ return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n); }catch(e){ return '$'+Math.round(n); } }
+    function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+    function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+    function capacity(){
+      var base = CONFIG.baseCapacity + GS.stats.strength*5;
+      var packBonus = (GS.gear && GS.gear.pack && GS.gear.pack.cap) ? GS.gear.pack.cap : 0;
+      var perkBonus = GS.perks && GS.perks.cap ? GS.perks.cap : 0;
+      return base + packBonus + perkBonus;
     }
-    function withdraw(amount){
-      amount = Math.floor(amount);
-      if(amount<=0 || amount>GS.bank){ log('Invalid withdrawal.', 'bad'); return; }
-      GS.bank -= amount; GS.credits += amount; log(`Withdrew <b>${fmt(amount)}</b> credits.`, 'good'); renderHUD(); renderBank();
+    function carried(){
+      var sum = 0;
+      for(var id in GS.inventory){
+        var q = GS.inventory[id];
+        var it = CONFIG.items.find(function(i){return i.id===id;});
+        sum += q * (it ? it.weight||1 : 1);
+      }
+      return sum;
     }
-    function borrow(amount){
-      amount = Math.floor(amount);
-      if(amount<=0){ log('Invalid loan amount.', 'bad'); return; }
-      GS.credits += amount; GS.debt += amount; log(`Took a loan of <b>${fmt(amount)}</b> credits. Keep an eye on interest.`, 'warn'); renderHUD(); renderBank();
+    function canCarry(itemId, qty){
+      qty = qty||1;
+      var it = CONFIG.items.find(function(i){return i.id===itemId;});
+      var w = it ? (it.weight||1) : 1;
+      return (carried() + w * qty) <= capacity();
     }
-    function repay(amount){
-      amount = Math.floor(amount);
-      if(amount<=0 || amount>GS.credits){ log('Invalid repayment.', 'bad'); return; }
-      const pay = Math.min(amount, GS.debt);
-      GS.credits -= pay; GS.debt -= pay; log(`Repaid <b>${fmt(pay)}</b> credits of debt.`, 'good'); renderHUD(); renderBank();
+    function travelRiskModifier(){
+      var veh = GS.gear && GS.gear.vehicle && GS.gear.vehicle.travelRisk ? GS.gear.vehicle.travelRisk : 0;
+      var heatPenalty = Math.min(0.10, (GS.heat/100) * 0.08);
+      return veh - heatPenalty;
+    }
+    function wealthScore(){
+      function sumIds(arr, cat){
+        var s=0;
+        for(var i=0;i<arr.length;i++){
+          var it=cat.find(function(x){return x.id===arr[i];});
+          s += it && it.cost ? it.cost : 0;
+        }
+        return s;
+      }
+      var P = CONFIG.store.property.concat([]);
+      var L = CONFIG.store.lux.concat(META.unlocks.items.map(function(id){
+        var found = CONFIG.store.lux.find(function(x){return x.id===id;});
+        return found || {id:id, name:id, cost:1000, charisma:0};
+      }));
+      function singleCost(x){ return x && x.cost ? x.cost : 0; }
+      return sumIds(GS.gear.property, P) + sumIds(GS.gear.lux, L) +
+        singleCost(GS.gear.vehicle) + singleCost(GS.gear.pack) + singleCost(GS.gear.weapon) + singleCost(GS.gear.armor) + GS.credits + GS.bank.balance - GS.bank.debt;
     }
 
-    // ---------- Hospital ----------
-    function healAll(){
-      const missing = GS.maxHealth - GS.health; if(missing<=0){ log('Already at full health.'); return; }
-      const cost = Math.max(10, missing * (1.8 - Math.min(0.6, GS.stats.tech*0.02))); // tech reduces cost
-      const c = Math.ceil(cost);
-      if(GS.credits < c){ log('Not enough credits to heal.', 'bad'); return; }
-      GS.credits -= c; GS.health = GS.maxHealth; log(`Healed to full for <b>${fmt(c)}</b> credits.`, 'good'); renderHUD(); renderHospital();
-      advanceDay('recovery');
+
+    // ---- Export key utility functions to global to avoid scoping issues ----
+    try{
+      window.capacity = capacity;
+      window.carried  = carried;
+      window.canCarry = canCarry;
+      window.runInPageSmokeTest = runInPageSmokeTest;
+    }catch(_e){ /* non-browser env */ }
+  // ================== MARKET MODEL ==================
+  // Market model: initialization, daily drift, and price calculation
+  // Key functions: initMarket, rollDailyDrift, basePriceFor, midPrice, askPrice, bidPrice
+  // ---------------------------------------------------
+    function initMarket(){
+      GS.market = {};
+      for(var d=0; d<CONFIG.districts.length; d++){
+        var did = CONFIG.districts[d].id;
+        GS.market[did] = { items:{} };
+        for(var i=0; i<CONFIG.items.length; i++){
+          var it = CONFIG.items[i];
+          var base = CONFIG.market.baselineStock;
+          var jitter = randInt(-6, 6);
+          GS.market[did].items[it.id] = {
+            stock: Math.max(0, base + jitter),
+            baseline: base,
+            trend: 0 // daily drift adds here
+          };
+        }
+      }
     }
 
-    // ---------- Stocks ----------
-    function buyStock(id, qty){
-      const s = STOCKS.find(x=>x.id===id); if(!s) return;
-      const cost = s.price * qty; if(qty<=0 || cost>GS.credits){ log('Invalid stock buy.', 'bad'); return; }
-      GS.credits -= cost; GS.stocks[id] = (GS.stocks[id]||0)+qty; log(`Bought <b>${qty}</b> ${s.name} @ ${fmt(s.price)}.`, 'good'); renderStocks(); renderHUD();
-    }
-    function sellStock(id, qty){
-      const s = STOCKS.find(x=>x.id===id); const have = GS.stocks[id]||0; if(qty<=0 || qty>have){ log('Invalid stock sell.', 'bad'); return; }
-      GS.stocks[id] = have - qty; const gain = s.price*qty; GS.credits += gain; log(`Sold <b>${qty}</b> ${s.name} @ ${fmt(s.price)}.`, 'good'); renderStocks(); renderHUD();
+    function rollDailyDrift(){
+      GS.dailySeed = GS.dailySeed || {};
+      for(var d=0; d<CONFIG.districts.length; d++){
+        var did = CONFIG.districts[d].id;
+        GS.dailySeed[did] = (Math.random()*2-1) * CONFIG.market.driftVol; // -vol..+vol
+      }
     }
 
-    // ---------- UI Rendering ----------
-    function renderHUD(){
-      GS.capacity = capacityFromStrength();
-      $('#hud-location').textContent = DISTRICTS.find(d=>d.id===GS.location).name;
-      $('#hud-day').textContent = GS.day;
-      $('#hud-credits').textContent = fmt(GS.credits);
-      $('#hud-health').textContent = `${GS.health}/${GS.maxHealth}`;
-      $('#hud-capacity').textContent = `${invWeight()}/${GS.capacity}`;
-      $('#hud-level').textContent = `${GS.level} (${GS.xp})`;
+    function basePriceFor(did, itemId){
+      // support calling basePriceFor(itemId) or basePriceFor(did, itemId)
+      if(arguments.length===1){ itemId = did; did = null; }
+      did = did || GS.location;
+      var it = CONFIG.items.find(function(x){return x.id===itemId;});
+      var d  = CONFIG.districts.find(function(x){return x.id===did;}) || {};
+      var p = (it && it.base ? it.base : 10) * (d.priceMod || 1);
+      // apply news/effects
+      for(var i=0;i<GS.effects.length;i++){
+        var fx = GS.effects[i];
+        if(it){
+          if(fx.affects && fx.affects.illegal && it.illegal) p *= (1+fx.affects.illegal);
+          if(fx.affects && fx.affects[it.id]) p *= (1+fx.affects[it.id]);
+        }
+      }
+      // global challenge modifiers
+      if(GS._priceBump) p *= (1+GS._priceBump);
+      return Math.max(1, Math.round(p));
     }
 
-    function setPanel(html){ $('#panel').innerHTML = html; }
+    function midPrice(did, itemId){
+      if(arguments.length===1){ itemId = did; did = null; }
+      did = did || GS.location;
+      var bp = basePriceFor(did, itemId);
+      var node = (GS.market[did] && GS.market[did].items[itemId]) ? GS.market[did].items[itemId] : null;
+      var result = bp;
+      if(node){
+        var ratio = node.stock / Math.max(1, node.baseline);
+        var scarcity = clamp((1 - ratio) * 0.8, -0.25, 1.25); // low stock -> higher price
+        var drift = (GS.dailySeed && GS.dailySeed[did] ? GS.dailySeed[did] : 0) + (node.trend||0);
+        result = Math.max(1, Math.round(bp * (1 + scarcity + drift)));
+      }
+      return result;
+    }
+
+    function askPrice(itemId, did){
+      if(arguments.length===1){ did = null; }
+      did = did || GS.location;
+      var mid = midPrice(did, itemId);
+      // ask is what you pay
+      return Math.max(1, Math.round(mid * (1 + CONFIG.market.spread/2)));
+    }
+    function bidPrice(itemId, did){
+      if(arguments.length===1){ did = null; }
+      did = did || GS.location;
+      var mid = midPrice(did, itemId);
+      var cut = CONFIG.market.spread/2 + CONFIG.market.tax;
+      var it = CONFIG.items.find(function(x){return x.id===itemId;});
+      if(it && it.illegal) cut += CONFIG.market.illegalFenceCut;
+      // bid is what you get when selling
+      return Math.max(1, Math.round(mid * (1 - cut)));
+    }
+
+    function transactBuy(itemId, qty, district){
+      qty = qty||1; if(arguments.length<3) district = GS.location;
+        var node = (GS.market[district] && GS.market[district].items[itemId]) ? GS.market[district].items[itemId] : null;
+        if(!node || node.stock <= 0){ logMessage('Market lacks stock.','bad'); return false; }
+        var maxQty = Math.min(100, qty);
+        var price = 0;
+        var bought = 0;
+        for(var k=0;k<maxQty;k++){
+          if(node.stock <= 0) break;
+          var unit = askPrice(itemId, district);
+          if(GS.credits < (price + unit)) break; // stop if cannot afford next unit
+          price += unit;
+          bought++;
+          // impact: buying reduces stock, raising price for next unit
+          node.stock = Math.max(0, node.stock - 1);
+          node.trend += CONFIG.market.impact; // small upward push
+        }
+        if(bought===0){ logMessage('Could not buy any units (stock/credits).','bad'); return false; }
+      if(!canCarry(itemId, qty)){ logMessage('Too heavy. Increase capacity.','bad'); return false; }
+      GS.credits -= price;
+      GS.inventory[itemId] = (GS.inventory[itemId]||0) + bought;
+      var itn = CONFIG.items.find(function(i){return i.id===itemId;}).name;
+      var unitStr = c(Math.round(price/bought));
+      logMessage('Bought '+bought+' '+itn+' @ '+unitStr+' each (total '+c(price)+'). Stock remaining: '+(node?node.stock:0), 'good');
+      try{ flashPrice(itemId, 'down'); }catch(_e){}
+      return true;
+    }
+
+    function transactBuyAll(itemId){
+      var node = GS.market[GS.location].items[itemId];
+      if(!node || node.stock <= 0){ logMessage('Market lacks stock.','bad'); return false; }
+      var bought = 0; var total = 0;
+      // buy until stock exhausted, credits exhausted, or carry full
+      while(node.stock>0){
+        var unit = askPrice(itemId);
+        if(GS.credits < (total + unit)) break;
+        if(!canCarry(itemId, 1)) break;
+        GS.credits -= unit; total += unit; bought++; node.stock = Math.max(0, node.stock-1); node.trend += CONFIG.market.impact;
+      }
+      if(bought===0){ logMessage('Could not buy any units (stock/credits/capacity).','bad'); return false; }
+      GS.inventory[itemId] = (GS.inventory[itemId]||0) + bought;
+      logMessage('Bought all available: '+bought+' units of '+(CONFIG.items.find(function(i){return i.id===itemId;}).name)+' for '+c(total)+'.','good');
+      try{ flashPrice(itemId, 'down'); updateCarryBar(); }catch(_e){}
+      return true;
+    }
+
+    function transactSell(itemId, qty, district){
+      qty = qty||1; if(arguments.length<3) district = GS.location;
+      var have = GS.inventory[itemId]||0;
+      if(have < qty){ logMessage('You don’t have enough.','bad'); return false; }
+      var node = (GS.market[district] && GS.market[district].items[itemId]) ? GS.market[district].items[itemId] : null;
+      if(!node){ logMessage('No buyers here.','bad'); return false; }
+      var price = 0;
+      var maxQ2 = Math.min(100, qty);
+      var sold = 0;
+      for(var k=0;k<maxQ2;k++){
+        if((GS.inventory[itemId]||0) <= 0) break;
+        var unit = bidPrice(itemId, district);
+        price += unit;
+        sold++;
+        // Selling increases stock, slightly lowering mid price
+        node.stock += 1;
+        node.trend -= CONFIG.market.impact; // downward push
+        GS.inventory[itemId] = GS.inventory[itemId]-1;
+        if(GS.inventory[itemId]<=0){ delete GS.inventory[itemId]; }
+      }
+  GS.credits += price;
+  var itn = CONFIG.items.find(function(i){return i.id===itemId;}).name;
+  var unitStr2 = c(Math.round(price/sold));
+  logMessage('Sold '+sold+' '+itn+' @ '+unitStr2+' each (total '+c(price)+'). Stock now: '+(node?node.stock:0),'good');
+  try{ flashPrice(itemId, 'up'); updateCarryBar(); updateHeatGauge(); }catch(_e){}
+      // Heat bump for illegal bulk sells in the district where sale occurred
+      var it = CONFIG.items.find(function(x){return x.id===itemId;});
+      if(it && it.illegal){
+        var d = CONFIG.districts.find(function(x){return x.id===district;});
+        var extraHeat = Math.round(qty * (d && d.priceMod>=1.05 ? 2 : 1));
+        GS.heat = Math.min(100, GS.heat + extraHeat);
+      }
+      return true;
+    }
+
+    function transactSellAll(itemId){
+      var have = GS.inventory[itemId]||0;
+      if(have<=0){ logMessage('You have none to sell.','bad'); return false; }
+      var node = GS.market[GS.location].items[itemId]; if(!node){ logMessage('No buyers here.','bad'); return false; }
+      var total = 0; var sold = 0;
+      var maxQ = have;
+      for(var k=0;k<maxQ;k++){
+        if((GS.inventory[itemId]||0) <= 0) break;
+        var unit = bidPrice(itemId);
+        total += unit;
+        sold++;
+        node.stock += 1;
+        node.trend -= CONFIG.market.impact; // downward push
+        GS.inventory[itemId] = GS.inventory[itemId]-1;
+        if(GS.inventory[itemId]<=0){ delete GS.inventory[itemId]; }
+      }
+      GS.credits += total;
+      logMessage('Sold '+sold+' '+(CONFIG.items.find(function(i){return i.id===itemId;}).name)+' @ avg '+c(Math.round(total/sold))+' each (total '+c(total)+').','good');
+      try{ flashPrice(itemId, 'up'); updateCarryBar(); }catch(_e){}
+      // heat for illegal goods
+      var it = CONFIG.items.find(function(x){return x.id===itemId;});
+      if(it && it.illegal){ var d = CONFIG.districts.find(function(x){return x.id===GS.location;}); var extraHeat = Math.round(sold * (d && d.priceMod>=1.05 ? 2 : 1)); GS.heat = Math.min(100, GS.heat + extraHeat); }
+      return true;
+    }
+
+    // UI helpers for animations and gauges
+    function flashPrice(itemId, dir){
+      try{
+        // Find the price cell in the rendered table and add a class
+        var inp = document.querySelector('input.qty[data-id="'+itemId+'"]');
+        if(!inp) return;
+        var row = inp.closest('tr');
+        if(!row) return;
+        var cell = (dir==='down') ? row.querySelector('td:nth-child(2)') : row.querySelector('td:nth-child(3)');
+        if(!cell) return;
+        cell.classList.add(dir==='down' ? 'price-down' : 'price-up');
+        setTimeout(function(){ cell.classList.remove(dir==='down' ? 'price-down' : 'price-up'); }, 900);
+      }catch(_e){}
+    }
+
+    function updateHeatGauge(){
+      try{
+        var wrap = document.getElementById('heat-gauge-wrap');
+        if(!wrap) return;
+        var fill = document.getElementById('heat-fill'); if(!fill) return;
+        var pct = Math.min(100, GS.heat||0);
+        fill.style.width = pct + '%';
+        var gauge = document.getElementById('heat-gauge');
+        if(pct>65) gauge.classList.add('shake'); else gauge.classList.remove('shake');
+      }catch(_e){}
+    }
+
+    function updateCarryBar(){
+      try{
+        var el = document.querySelector('.carry-fill'); if(!el) return;
+        var pct = Math.min(100, Math.round((carried()/capacity())*100));
+        el.style.width = pct + '%';
+        if(pct>100) el.style.boxShadow = '0 0 8px rgba(255,45,75,0.2)'; else el.style.boxShadow = '';
+      }catch(_e){}
+    }
+
+    // Toast helper (non-blocking notifications)
+    function toast(msg, type){
+      try{
+        var container = document.getElementById('toast-container');
+        if(!container){ container = document.createElement('div'); container.id='toast-container'; container.style.position='fixed'; container.style.top='72px'; container.style.right='18px'; container.style.zIndex='60'; document.body.appendChild(container); }
+        if(!container.getAttribute('role')){ container.setAttribute('role','status'); container.setAttribute('aria-live','polite'); container.setAttribute('aria-atomic','false'); }
+        var d = document.createElement('div'); d.textContent = msg; d.className = 'glass p-2 mb-2'; d.setAttribute('role','note'); d.setAttribute('aria-live','polite'); if(type==='good') d.style.border='1px solid rgba(46,200,90,0.06)'; if(type==='bad') d.style.border='1px solid rgba(255,80,80,0.06)'; container.appendChild(d);
+        setTimeout(function(){ try{ d.style.transition='opacity .28s'; d.style.opacity='0'; setTimeout(function(){ try{ container.removeChild(d); }catch(_e){} }, 300); }catch(_e){} }, 2600);
+      }catch(_e){}
+    }
+
+    // Inject a tiny small-screen style tweak (autosave indicator, HUD font sizes)
+    try{
+      var _styleSmall = document.createElement('style');
+      _styleSmall.innerHTML = '@media (max-width:900px){ #autosave-indicator{ width:10px; height:10px } #hud-line1, #hud-line2{ font-size:12px } #mobile-nav{ display:flex !important } }';
+      document.head.appendChild(_styleSmall);
+    }catch(_e){}
+
+    function playDamageFlash(){
+      try{ document.body.classList.add('damage-flash'); setTimeout(function(){ document.body.classList.remove('damage-flash'); }, 420); }catch(_e){}
+    }
+
+    function restockAll(){
+      // each district pulls stock back toward baseline
+      for(var d=0; d<CONFIG.districts.length; d++){
+        var did = CONFIG.districts[d].id;
+        var items = GS.market[did].items;
+        for(var id in items){
+          var node = items[id];
+          var gap = node.baseline - node.stock;
+          var delta = Math.round(gap * CONFIG.market.restockRate);
+          node.stock += delta;
+          // decay trend a bit
+          node.trend *= 0.5;
+        }
+      }
+      // new daily drift
+      rollDailyDrift();
+    }
+
+  // =================== ECONOMY / EVENTS ====================
+  // News and event-driven modifiers that affect prices and global state
+  // ------------------------------------------------------------
+    function pruneExpiredEffects(){
+      GS.effects = GS.effects.filter(function(fx){ return fx.endsAt > GS.day; });
+    }
+    function maybeStartDailyEvent(){
+      if(Math.random() < CONFIG.eventDailyChance){
+        var pick = CONFIG.events[randInt(0,CONFIG.events.length-1)];
+        var fx = {id:pick.id, label:pick.label, affects:Object.assign({},pick.affects), duration:pick.duration};
+        fx.endsAt = GS.day + fx.duration;
+        GS.effects.push(fx);
+        logMessage('News: '+fx.label, 'warn');
+        META.codex['news_'+fx.id] = true; saveMeta();
+      }
+    }
+
+    // ------------------ ENCOUNTERS (unchanged core) ------------------
+    function weightedPick(list){
+      var sum = list.reduce(function(s,x){return s+x.weight;},0);
+      var r = Math.random()*sum;
+      for(var i=0;i<list.length;i++){ r -= list[i].weight; if(r<=0) return list[i]; }
+      return list[list.length-1];
+    }
+    function startEncounter(enc){
+      META.codex['saw_'+enc.id] = true; saveMeta();
+      // Show encounter card art briefly before resolving
+      try{ showEncounterCard(enc); }catch(_e){}
+      if(enc.id==='cops') return copsEncounter();
+      if(enc.id==='rival') return rivalEncounter();
+      if(enc.id==='mugger') return muggerEncounter();
+      if(enc.id==='hazard') return hazardEncounter();
+    }
+
+    // Show a brief illustrated encounter card with silhouette
+    function showEncounterCard(enc){
+      var div = document.createElement('div');
+      div.className = 'fixed inset-0 flex items-center justify-center p-4 z-60';
+      div.style.background = 'radial-gradient(ellipse at center, rgba(2,6,12,0.6), rgba(0,0,0,0.9))';
+      div.innerHTML = '<div class="event-card">'+
+        '<div class="event-art"><div class="encounter-sil">'+(enc.label||'')+'</div></div>'+
+        '<div class="font-semibold mb-2">'+enc.label+'</div>'+
+        '<div class="text-sm mb-3">A tense moment unfolds.</div>'+
+        '<div class="text-right"><button class="btn" id="enc-continue">Continue</button></div>'+
+      '</div>';
+      document.body.appendChild(div);
+      document.documentElement.classList.add('locked');
+      var btn = div.querySelector('#enc-continue');
+      btn.addEventListener('click', function(){ try{ document.body.removeChild(div);}catch(e){} document.documentElement.classList.remove('locked'); });
+      // auto-remove after 1.1s if user doesn't click
+      setTimeout(function(){ try{ if(document.body.contains(div)) try{ document.body.removeChild(div);}catch(_e){} document.documentElement.classList.remove('locked'); }catch(_e){} }, 1100);
+    }
+
+    // Cop proximity: if district risk is high or random encounter occurs, flag illegal rows
+    function detectCopProximity(){
+      try{
+        var d = CONFIG.districts.find(function(x){return x.id===GS.location;});
+        var danger = (d && d.risk) ? d.risk : 0.12;
+        // if heat high or district risk high, flicker illegal items
+        var copsNearby = (GS.heat>40) || (danger>0.15) || (Math.random() < 0.02);
+        var rows = document.querySelectorAll('tr');
+        for(var i=0;i<rows.length;i++){
+          var r = rows[i];
+          var inp = r.querySelector('input.qty');
+          if(!inp) continue;
+          var id = inp.dataset.id;
+          var it = CONFIG.items.find(function(x){return x.id===id;});
+          if(it && it.illegal){ r.classList.toggle('illegal-flicker', !!copsNearby); r.classList.add('illegal-row'); }
+        }
+      }catch(_e){}
+    }
+
+    // Heat alarm: small visual pulse and optional beep (not adding audio by default)
+    var _heatAlarmTimeout = null;
+    function playHeatAlarm(){
+      try{
+        var fill = document.getElementById('heat-fill'); if(!fill) return;
+        fill.style.boxShadow = '0 0 18px rgba(255,45,149,0.18)';
+        clearTimeout(_heatAlarmTimeout);
+        _heatAlarmTimeout = setTimeout(function(){ try{ fill.style.boxShadow='0 0 12px rgba(255,45,149,0.06)'; }catch(_e){} }, 800);
+      }catch(_e){}
+    }
+
+    // Motion toggle (persisted)
+    function toggleMotion(off){
+      try{ var root = document.documentElement; if(off) root.classList.add('reduced-motion'); else root.classList.remove('reduced-motion'); localStorage.setItem('ED_REDUCED_MOTION', off? '1':'0'); }catch(_e){}
+    }
+    function attackPower(){ var base = 1 + GS.stats.strength; var w = (GS.gear && GS.gear.weapon && GS.gear.weapon.dmg) ? GS.gear.weapon.dmg : 0; return base + w; }
+    function defense(){ var base = Math.floor(GS.stats.agility/2); var dr = (GS.gear && GS.gear.armor && GS.gear.armor.dr) ? GS.gear.armor.dr : 0; return base + dr; }
+    // D20 / D&D-like helpers
+    function abilityMod(score){ return Math.floor((score - 10) / 2); }
+    function rollDie(sides){ return randInt(1, sides); }
+    function rollD20(){ return rollDie(20); }
+    function rollDice(times, sides){ var sum=0; for(var i=0;i<times;i++) sum += rollDie(sides); return sum; }
+
+    // Centralized NPC templates for easy tuning
+    function npcTemplate(kind){
+      var templates = {
+        cop: {hp:14, ac:12, atk:2, dmgDice:[1,6]},
+        mugger: {hp:6, ac:11, atk:1, dmgDice:[1,4]},
+        rival: {hp:10, ac:12, atk:2, dmgDice:[1,6]}
+      };
+      var t = templates[kind] || templates.rival;
+      // return a fresh instance; add some light variance to HP
+      return {hp: t.hp + randInt(0, Math.max(0, Math.floor(t.hp/3))), ac: t.ac, atk: t.atk, dmgDice: t.dmgDice.slice()};
+    }
+
+    function takeDamage(n){
+      var reduced = Math.max(1, n - 0); // armor reduces chance to be hit (AC), not flat damage here
+      GS.hp = Math.max(0, GS.hp - reduced);
+      try{ playDamageFlash(); }catch(_e){}
+      updateUI();
+      if(GS.hp<=0) gameOver('hp');
+    }
+
+    // Estimate player's chance to hit a target using D20 math
+    function fightOdds(){
+      try{
+        var playerAtkBonus = abilityMod(GS.stats.strength) + (GS.gear && GS.gear.weapon ? 1 : 0);
+        var playerHitCount = 0;
+        var targetAC = 10 + 2; // assume modest NPC AC of 12
+        for(var d=1; d<=20; d++){
+          if(d===20) { playerHitCount++; continue; } // nat20 always hit
+          if(d===1) continue; // nat1 auto miss
+          if(d + playerAtkBonus >= targetAC) playerHitCount++;
+        }
+        return Math.max(0.05, Math.min(0.95, playerHitCount/20));
+      }catch(_e){ return 0.5; }
+    }
+    function runOdds(delta){
+      delta = delta||0;
+      var perk = GS.perks && GS.perks.copRun ? GS.perks.copRun : 0;
+      var base = 0.45 + GS.stats.agility*0.03 + (GS.gear && GS.gear.vehicle ? 0.1:0) + perk + delta;
+      return Math.max(0.1, Math.min(0.9, base));
+    }
+    function loot(maxCreds, maxGoods){
+      GS.credits += randInt(20, maxCreds);
+      var k = randInt(0, maxGoods);
+      for(var i=0;i<k;i++){
+        var it = CONFIG.items[randInt(0, CONFIG.items.length-1)];
+        if(canCarry(it.id,1)) GS.inventory[it.id]=(GS.inventory[it.id]||0)+1;
+      }
+    }
+    function confiscateIllegal(){
+      var keys = Object.keys(GS.inventory);
+      for(var i=0;i<keys.length;i++){
+        var id = keys[i];
+        var it = CONFIG.items.find(function(x){return x.id===id;});
+        if(it && it.illegal) delete GS.inventory[id];
+      }
+    }
+
+    function rivalEncounter(){
+      var demand = Math.min(GS.credits, 100 + Math.floor(Math.random()*200));
+      logMessage('Rival gang blocks your path.', 'warn');
+      showChoices('Rivals demand tribute', [
+        {label:'Pay', run:function(){GS.credits-=demand; GS.heat=Math.max(0,GS.heat-2); logMessage('Paid '+c(demand)+' to pass.','warn');}},
+        {label:'Fight', run:function(){
+          // Simple D20 exchange: player attacks first
+          var weapon = GS.gear && GS.gear.weapon ? GS.gear.weapon : null;
+          var playerAtkBonus = abilityMod(GS.stats.strength) + (weapon ? 1 : 0);
+          var playerAC = 10 + abilityMod(GS.stats.agility) + ((GS.gear && GS.gear.armor && GS.gear.armor.dr) ? GS.gear.armor.dr : 0);
+          var enemy = npcTemplate('rival');
+          var atkRoll = rollD20();
+          var hit = false; var crit = false;
+          if(atkRoll===20) { hit = true; crit = true; }
+          else if(atkRoll!==1 && (atkRoll + playerAtkBonus) >= enemy.ac) hit = true;
+          if(hit){
+            var baseDmg = (weapon && weapon.dmg) ? weapon.dmg : 2;
+            var dmg = baseDmg + Math.max(0, abilityMod(GS.stats.strength));
+            if(crit) dmg = dmg * 2;
+            enemy.hp -= dmg;
+            logMessage('You hit the rival for '+dmg+' damage.','good');
+            if(enemy.hp <= 0){ loot(180,3); GS.heat+=6; logMessage('You defeated the rival and looted the area.','good'); updateUI(); return; }
+          } else {
+            logMessage('Your attack missed (rolled '+atkRoll+').','bad');
+          }
+          // Enemy retaliates
+          var enemyAtkRoll = rollD20();
+          if(enemyAtkRoll===20 || (enemyAtkRoll!==1 && (enemyAtkRoll + enemy.atk) >= playerAC)){
+            var ed = rollDice(enemy.dmgDice[0], enemy.dmgDice[1]);
+            takeDamage(ed);
+            GS.heat += 4;
+            logMessage('The rival hits you for '+ed+' damage.','bad');
+          } else {
+            logMessage('The rival missed you (rolled '+enemyAtkRoll+').','good');
+          }
+        }},
+        {label:'Run', run:function(){
+          if(Math.random()< runOdds()){ logMessage('You slipped away.','good'); }
+          else { takeDamage(6+randInt(0,6)); logMessage('Caught a few hits while fleeing.','bad'); }
+        }}
+      ]);
+    }
+    function copsEncounter(){
+      logMessage('Enforcers stop you for inspection.', 'warn');
+      var hasContraband = Object.keys(GS.inventory).some(function(id){
+        var q=GS.inventory[id]; if(q<=0) return false;
+        var it = CONFIG.items.find(function(i){return i.id===id;});
+        return it && it.illegal;
+      });
+      var bribe = 100 + Math.floor(GS.credits*0.05);
+      var disc = (1 - 0.03*Math.min(10,GS.stats.charisma));
+      bribe = Math.round(bribe * Math.max(0.1,disc));
+
+      // basic cop stats for potential escalation
+  var cop = npcTemplate('cop');
+      var playerAC = 10 + abilityMod(GS.stats.agility) + ((GS.gear && GS.gear.armor && GS.gear.armor.dr) ? GS.gear.armor.dr : 0);
+      var playerAtkBonus = abilityMod(GS.stats.strength) + ((GS.gear && GS.gear.weapon) ? 1 : 0);
+
+      showChoices('Inspection', [
+        {label:'Comply', run:function(){
+          if(hasContraband && Math.random()<0.7){ confiscateIllegal(); GS.heat+=10; logMessage('Contraband confiscated. Heat rises.','bad'); }
+          else { logMessage('Cleared after questions.','good'); }
+        }},
+        {label:'Bribe ('+c(bribe)+')', run:function(){
+          // Resolve bribe with a D20 + CHA check versus DC 12
+          var chaMod = abilityMod(GS.stats.charisma);
+          var roll = rollD20();
+          if(roll===20 || (roll!==1 && (roll + chaMod) >= 12)){
+            if(GS.credits>=bribe){ GS.credits -= bribe; GS.heat = Math.max(0, GS.heat-5); logMessage('Bribe accepted. You move on.','warn'); }
+            else { logMessage('Could not afford a bribe.','bad'); }
+            return;
+          }
+          // Bribe failed: cops escalate and may attack
+          logMessage('Bribe rejected (rolled '+roll+'). Officers become hostile.','bad');
+          GS.heat += 8;
+          // Cop attack roll
+          var atk = rollD20();
+          if(atk===20 || (atk!==1 && (atk + cop.atk) >= playerAC)){
+            var ed = rollDice(cop.dmgDice[0], cop.dmgDice[1]);
+            takeDamage(ed);
+            logMessage('An officer hits you for '+ed+' damage.','bad');
+          } else {
+            logMessage('Officers missed you (rolled '+atk+').','good');
+          }
+        }},
+        {label:'Run', run:function(){
+          if(Math.random()< runOdds(-0.1)){ GS.heat+=8; logMessage('You ditched the stop. Heat +8.','warn'); }
+          else { takeDamage(8+randInt(0,8)); GS.heat+=12; logMessage('They didn’t like that. Heat +12.','bad'); }
+        }}
+      ]);
+    }
+    function muggerEncounter(){
+      logMessage('A mugger lunges from the shadows.', 'warn');
+      // Resolve as quick D20 skirmish
+      var weapon = GS.gear && GS.gear.weapon ? GS.gear.weapon : null;
+      var playerAtkBonus = abilityMod(GS.stats.strength) + (weapon ? 1 : 0);
+      var playerAC = 10 + abilityMod(GS.stats.agility) + ((GS.gear && GS.gear.armor && GS.gear.armor.dr) ? GS.gear.armor.dr : 0);
+  var mugger = npcTemplate('mugger');
+      var atkRoll = rollD20();
+      if(atkRoll===20 || (atkRoll!==1 && (atkRoll + playerAtkBonus) >= mugger.ac)){
+        var baseDmg = (weapon && weapon.dmg) ? weapon.dmg : 1;
+        var dmg = baseDmg + Math.max(0, abilityMod(GS.stats.strength));
+        if(atkRoll===20) dmg = dmg * 2;
+        mugger.hp -= dmg;
+        GS.heat += 2;
+        logMessage('You hit the mugger for '+dmg+' damage.','good');
+        if(mugger.hp <= 0){ loot(80,1); logMessage('You countered and looted.','good'); updateUI(); return; }
+      } else {
+        logMessage('Your attack missed (rolled '+atkRoll+').','bad');
+      }
+      // Mugger attacks back
+      var mAtk = rollD20();
+      if(mAtk===20 || (mAtk!==1 && (mAtk + mugger.atk) >= playerAC)){
+        var ed = rollDice(mugger.dmgDice[0], mugger.dmgDice[1]);
+        takeDamage(ed);
+        logMessage('The mugger hits you for '+ed+' damage.','bad');
+      } else {
+        logMessage('The mugger missed you (rolled '+mAtk+').','good');
+      }
+      updateUI();
+    }
+    function hazardEncounter(){
+      logMessage('Transit hazard forces a detour.','warn');
+      takeDamage(2+randInt(0,5));
+      updateUI();
+    }
+
+    // ------------------ CORE LOOPS ------------------
+    function travel(toId){
+      if(GS.locked) return;
+      if(toId===GS.location) return;
+      var dest = CONFIG.districts.find(function(d){return d.id===toId;});
+      GS.location = toId;
+      GS.day += 1;
+
+      pruneExpiredEffects();
+      maybeStartDailyEvent();
+      restockAll(); // market rebalances daily
+      // bank interest
+      GS.bank.balance = Math.round(GS.bank.balance * 1.01);
+      GS.bank.debt    = Math.round(GS.bank.debt    * 1.03);
+
+      var riskBase = dest.risk * (1 - GS.stats.agility/25);
+      var contraband = Object.keys(GS.inventory).reduce(function(n,id){
+        var q=GS.inventory[id];
+        var it = CONFIG.items.find(function(i){return i.id===id;});
+        return n + ((it && it.illegal) ? q : 0);
+      }, 0);
+      var contrabandPenalty = 0.03 * Math.min(10, contraband);
+      var travelRisk = riskBase + contrabandPenalty + (travelRiskModifier());
+      travelRisk = Math.min(0.55, Math.max(0.02, travelRisk));
+
+      if(Math.random() < travelRisk) startEncounter(weightedPick(CONFIG.encounters));
+      else logMessage('Safe arrival at '+dest.name+'.', 'good');
+
+      updateUI(); saveGame();
+    }
+
+    // ------------------ END RUN / META PROGRESSION ------------------
+    function gameOver(reason){
+      GS.locked=true;
+      endRun(reason||'hp');
+    }
+    function endRun(reason){
+      var pts = Math.max(0, Math.floor(wealthScore()/1000));
+      if(GS.day>=5) pts += 1;
+      META.legacyPoints += pts;
+        generateContracts();
+      if(GS.gear.lux && GS.gear.lux.length){
+        var heir = GS.gear.lux[randInt(0, GS.gear.lux.length-1)];
+        if(META.unlocks.items.indexOf(heir)===-1) META.unlocks.items.push(heir);
+      }
+      saveMeta();
+      logMessage('Run ended ('+reason+'). You earned '+pts+' Legacy Points.', 'warn');
+      showMetaHub();
+    }
+
+    // ------------------ UI ------------------
+    function setActiveTab(t){
+      ACTIVE_TAB = t;
+      var tabs = document.querySelectorAll('.tab');
+      for(var i=0;i<tabs.length;i++){
+        tabs[i].classList.toggle('tab-active', tabs[i].dataset.tab===t);
+      }
+      render();
+      try{ if(t==='trade'){ var ts = document.getElementById('trade-search'); if(ts){ try{ ts.focus(); ts.select(); }catch(_e){} } } }catch(_e){}
+      try{ updateNavAria(); }catch(_e){}
+    }
+
+    // Update ARIA states for left nav / mobile nav
+    function updateNavAria(){
+      try{
+        var navBtns = document.querySelectorAll('#left-nav [role="tab"], #mobile-nav [role="tab"]');
+        for(var i=0;i<navBtns.length;i++){
+          var b = navBtns[i];
+          var is = (b.dataset && b.dataset.tab) ? (b.dataset.tab===ACTIVE_TAB) : false;
+          if(b.getAttribute('role')==='tab') b.setAttribute('aria-selected', is? 'true':'false');
+          if(is) b.setAttribute('aria-current','true'); else b.removeAttribute('aria-current');
+        }
+      }catch(_e){}
+    }
+    function render(){
+      var el = elPanel(); if(!el) return;
+      var html='';
+      if(ACTIVE_TAB==='trade') html = renderTrade();
+      else if(ACTIVE_TAB==='travel') html = renderTravel();
+      else if(ACTIVE_TAB==='store') html = renderStore();
+      else if(ACTIVE_TAB==='bank') html = renderBank();
+      else if(ACTIVE_TAB==='hospital') html = renderHospital();
+      else if(ACTIVE_TAB==='character') html = renderCharacter();
+      else if(ACTIVE_TAB==='hub') html = renderHub();
+      else if(ACTIVE_TAB==='contracts') html = renderContracts();
+  el.innerHTML = html;
+  // restore trade selection if present
+  try{ if(window._TRADE_SELECTED){ var s = document.getElementById('trade-item-select'); if(s) s.value = window._TRADE_SELECTED; }
+  var s2 = document.getElementById('trade-item-select'); if(s2 && !window._TRADE_SELECTED){ window._TRADE_SELECTED = s2.value; }
+  }catch(_e){}
+      updateHUD();
+      try{ setupTicker(); }catch(_e){}
+      try{ detectCopProximity(); }catch(_e){}
+      try{ if((GS.heat||0) > 60) playHeatAlarm(); }catch(_e){}
+      // Wire trade filters/search if present
+      try{
+        var tf = document.getElementById('trade-filter'); if(tf){ tf.value = window._TRADE_FILTER || 'all'; tf.addEventListener('change', function(){ window._TRADE_FILTER = tf.value; render(); }); }
+        var ts = document.getElementById('trade-search'); if(ts){ ts.value = window._TRADE_SEARCH || ''; ts.addEventListener('input', function(){ window._TRADE_SEARCH = ts.value; render(); }); }
+      }catch(_e){}
+    }
+
+    function setupTicker(){
+      try{
+        var t = document.getElementById('news-ticker'); if(!t) return;
+        var totalWidth = 0; var spans = t.querySelectorAll('.tick');
+        for(var i=0;i<spans.length;i++){ totalWidth += spans[i].offsetWidth + 48; }
+        var duration = Math.max(8, Math.min(40, Math.round(totalWidth/20)));
+        var inner = t.querySelector('.tick'); if(!inner) return;
+        t.querySelectorAll('.tick').forEach(function(s){ s.style.animationDuration = duration+'s'; });
+      }catch(_e){}
+    }
+    function updateHUD(){
+      var d = CONFIG.districts.find(function(x){return x.id===GS.location;});
+  var line1 = 'Day '+(GS.day||'?')+' • '+(d?d.name:'?');
+  var el1 = document.getElementById('hud-line1'); if(el1) el1.textContent = line1;
+  var hud2 = 'HP '+(GS.hp||0)+' • '+c(GS.credits||0)+' • Carry '+carried()+'/'+capacity()+' • Heat '+(GS.heat||0)+' • LP '+META.legacyPoints;
+      var el2 = document.getElementById('hud-line2');
+      if(el2){ el2.textContent = hud2; el2.style.background = 'linear-gradient(90deg, rgba(0,227,255,0.02), rgba(255,45,149,0.02))'; el2.style.padding = '0.15rem 0.5rem'; el2.style.borderRadius = '8px'; }
+      try{ updateHeatGauge(); updateCarryBar(); }catch(_e){}
+    }
 
     function renderTrade(){
-      const rows = ITEMS.map(it=>{
-        const p = GS.prices[it.id];
-        const finalBuy = priceWithCharisma(p);
-        const have = GS.inventory[it.id]||0;
-        const maxByMoney = Math.floor(GS.credits / finalBuy);
-        const maxByCapacity = Math.floor((GS.capacity - invWeight()) / it.weight);
-        const maxBuy = Math.max(0, Math.min(maxByMoney, maxByCapacity));
-        return `
-          <tr>
-            <td><b>${it.name}</b><div class="k">${it.cat}${it.illegal?' • <span style="color:#ff86a0">illegal</span>':''}</div></td>
-            <td>${fmt(finalBuy)}</td>
-            <td>${fmt(Math.round(p*0.95))}</td>
-            <td>${have}</td>
-            <td>
-              <div style="display:flex; gap:6px; align-items:center">
-                <input type="number" min="1" value="1" id="qty-${it.id}" style="width:86px">
-                <button class="btn" data-buy="${it.id}">Buy</button>
-                <button class="btn" data-buymax="${it.id}">Max</button>
-                <button class="btn" data-sell="${it.id}">Sell 1</button>
-                <button class="btn" data-sellall="${it.id}">Sell All</button>
-              </div>
-            </td>
-          </tr>`;
+      // Table-style market UI with filters/search and affordances
+      var filter = (window._TRADE_FILTER || 'all');
+      var search = (window._TRADE_SEARCH || '').toLowerCase();
+      var itemsFiltered = CONFIG.items.filter(function(it){
+        // filter by legal/illegal/owned
+        if(filter==='legal' && it.illegal) return false;
+        if(filter==='illegal' && !it.illegal) return false;
+        if(filter==='owned' && !(GS.inventory[it.id] && GS.inventory[it.id] > 0)) return false;
+        // search by name/id
+        if(search){ var s = (it.name||it.id||'').toLowerCase(); if(s.indexOf(search)===-1) return false; }
+        return true;
+      });
+
+      var rows = itemsFiltered.map(function(it){
+        var node = (GS.market[GS.location] && GS.market[GS.location].items[it.id]) ? GS.market[GS.location].items[it.id] : {stock:0, baseline:0};
+        var ask = askPrice(it.id);
+        var bid = bidPrice(it.id);
+        var canBuyOne = (node.stock>0) && (ask <= GS.credits) && canCarry(it.id,1);
+        var canBuyAny = (node.stock>0) && (GS.credits >= ask) && (carried() < capacity());
+        var canSell = (GS.inventory[it.id] && GS.inventory[it.id] > 0);
+        var buyTitle = !node || node.stock<=0 ? 'No stock' : (ask > GS.credits ? 'Insufficient credits' : (!canCarry(it.id,1) ? 'Not enough carry capacity' : 'Buy'));
+        var sellTitle = canSell ? 'Sell' : 'You have none to sell';
+        return '<tr class="'+(it.illegal? 'illegal-row':'' )+'">'+
+          '<td class="font-semibold">'+it.name+'<div class="text-xs text-sky-200/60">'+(it.desc||'')+'</div></td>'+
+          '<td>'+c(ask)+'</td>'+
+          '<td>'+c(bid)+'</td>'+
+          '<td>'+node.stock+'</td>'+
+          '<td><input class="qty" data-id="'+it.id+'" type="number" min="1" value="1" style="width:4.5rem"></td>'+
+          '<td class="space-x-1">'+
+            '<button class="btn" '+(canBuyOne? '':'disabled')+' title="'+buyTitle+'" data-action="buy" data-id="'+it.id+'">Buy</button>'+
+            '<button class="btn" '+(canBuyAny? '':'disabled')+' title="'+buyTitle+'" data-action="buyQty" data-id="'+it.id+'">Buy Qty</button>'+
+            '<button class="btn" '+(canBuyAny? '':'disabled')+' title="'+buyTitle+'" data-action="buyAll" data-id="'+it.id+'">Buy All</button>'+
+          '</td>'+
+          '<td class="space-x-1">'+
+            '<button class="btn" '+(canSell? '':'disabled')+' title="'+sellTitle+'" data-action="sell" data-id="'+it.id+'">Sell</button>'+
+            '<button class="btn" '+(canSell? '':'disabled')+' title="'+sellTitle+'" data-action="sellQty" data-id="'+it.id+'">Sell Qty</button>'+
+            '<button class="btn" '+(canSell? '':'disabled')+' title="'+sellTitle+'" data-action="sellAll" data-id="'+it.id+'">Sell All</button>'+
+          '</td>'+
+        '</tr>';
       }).join('');
-
-      setPanel(`
-        <div class="grid cols-2">
-          <div class="card">
-            <div class="title"><h2>Market — ${DISTRICTS.find(d=>d.id===GS.location).name}</h2><span class="pill">Rumors active: ${GS.rumors.length}</span></div>
-            <table>
-              <thead><tr><th>Item</th><th>Buy</th><th>Sell</th><th>Owned</th><th>Actions</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-          <div class="card">
-            <div class="title"><h2>Rumors & Events</h2><button class="btn" id="btn-refresh">Refresh Prices</button></div>
-            <div id="rumors">${GS.rumors.length? GS.rumors.map(r=>`<div class="logline ${r.mult>1?'good':'bad'}">${ITEMS.find(i=>i.id===r.item).name} ${r.mult>1?'surge':'crash'} in effect.</div>`).join('') : '<div class="k">No persistent rumors today.</div>'}</div>
-          </div>
-        </div>
-      `);
-
-      // wire
-      $('#btn-refresh').onclick = ()=>{ advanceDay('market recalibration'); renderTrade(); };
-      $$('#panel [data-buy]').forEach(b=> b.onclick = ()=>{
-        const id = b.getAttribute('data-buy'); const q = parseInt($(`#qty-${id}`).value||'1',10); buy(id, q);
-      });
-      $$('#panel [data-buymax]').forEach(b=> b.onclick = ()=>{
-        const id = b.getAttribute('data-buymax');
-        const price = priceWithCharisma(GS.prices[id]); const item = ITEMS.find(i=>i.id===id);
-        const maxByMoney = Math.floor(GS.credits / price); const maxByCapacity = Math.floor((GS.capacity - invWeight())/item.weight);
-        const q = Math.max(0, Math.min(maxByMoney, maxByCapacity)); buy(id, q);
-      });
-      $$('#panel [data-sell]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-sell'); sell(id, 1); });
-      $$('#panel [data-sellall]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-sellall'); sell(id, GS.inventory[id]||0); });
+      var invList = Object.keys(GS.inventory).map(function(id){ var it = CONFIG.items.find(function(x){return x.id===id;}); return '<li>'+ (it?it.name:id) +' x'+GS.inventory[id]+'</li>'; }).join('') || '<li>Empty</li>';
+      return '<div class="grid gap-3 md:grid-cols-3">'+
+        '<div class="md:col-span-2 glass rounded-xl p-3">'+
+          '<div class="flex items-center justify-between mb-3">'+
+            '<div class="font-semibold">Market — '+ (CONFIG.districts.find(function(d){return d.id===GS.location;})||{}).name +'</div>'+
+            '<div class="flex gap-2 items-center">'+
+              '<select id="trade-filter" class="btn" style="min-width:110px">'+
+                '<option value="all">All</option><option value="legal">Legal</option><option value="illegal">Illegal</option><option value="owned">Owned</option>'+
+              '</select>'+
+              '<input id="trade-search" placeholder="Search items..." class="qty" style="min-width:160px"/>'+
+            '</div>'+
+          '</div>'+
+          '<div class="overflow-auto"><table class="w-full"><thead><tr><th>Item</th><th>Ask</th><th>Bid</th><th>Stock</th><th>Qty</th><th>Buy</th><th>Sell</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        '</div>'+
+        '<div class="glass rounded-xl p-3">'+
+          '<div class="font-semibold mb-2">Active News</div>'+
+          '<div class="ticker" id="news-ticker">'+ (GS.effects.length? GS.effects.map(function(f){return '<span class="tick">'+f.label+' (until day '+f.endsAt+')</span>';}).join('') : '<span class="tick">No active news</span>') +'</div>'+
+          '<div class="mt-3 text-sm">Carry: '+carried()+'/'+capacity()+'</div>'+
+          '<div class="mt-3"><div class="font-semibold">Inventory</div><ul>'+invList+'</ul></div>'+
+        '</div>'+
+      '</div>';
     }
 
-    function renderInventory(){
-      const rows = Object.keys(GS.inventory).length ? Object.entries(GS.inventory).map(([id,qty])=>{
-        const it = ITEMS.find(i=>i.id===id); const weight = it.weight*qty;
-        return `<tr><td><b>${it.name}</b></td><td>${qty}</td><td>${weight}</td><td><button class="btn" data-drop="${id}">Drop 1</button></td></tr>`;
-      }).join('') : '<tr><td colspan="4" class="k">Your pockets echo. Go buy something.</td></tr>';
-
-      setPanel(`
-        <div class="card">
-          <div class="title"><h2>Inventory</h2><span class="pill">Load ${invWeight()}/${GS.capacity}</span></div>
-          <table>
-            <thead><tr><th>Item</th><th>Qty</th><th>Weight</th><th>Action</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `);
-
-      $$('#panel [data-drop]').forEach(b=> b.onclick = ()=>{
-        const id = b.getAttribute('data-drop'); if((GS.inventory[id]||0)>0){ GS.inventory[id]--; if(GS.inventory[id]<=0) delete GS.inventory[id]; log(`Dropped 1 × ${ITEMS.find(i=>i.id===id).name}.`,'warn'); renderInventory(); renderHUD(); }
-      });
-    }
-
-    function renderMap(){
-      const cards = DISTRICTS.map(d=>{
-        const here = d.id===GS.location; const risk = Math.round(Math.max(1, (d.risk - GS.stats.agility*0.002)*100));
-        return `<div class="card">
-          <div class="title"><h2>${d.name}</h2>${here?'<span class="pill">Here</span>':`<span class="pill">Risk ~${risk}%</span>`}</div>
-          <div class="k">Market mod: ${(d.priceMod*100).toFixed(0)}%</div>
-          ${here?'' : `<div style="margin-top:8px"><button class="btn primary" data-go="${d.id}">Travel</button></div>`}
-        </div>`;
+    function renderTravel(){
+      var cards = CONFIG.districts.map(function(d){
+        var here = d.id===GS.location ? '<span class="tag text-green-300">here</span>' : '';
+        return '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold">'+d.name+' '+here+'</div>'+
+          '<div class="text-sm text-sky-200/80">Risk '+Math.round(d.risk*100)+'%</div>'+
+          '<button class="btn mt-2" data-action="go" data-id="'+d.id+'">Travel</button>'+
+        '</div>';
       }).join('');
-
-      setPanel(`<div class="grid">${cards}</div>`);
-      $$('#panel [data-go]').forEach(b=> b.onclick = ()=> travelTo(b.getAttribute('data-go')) );
+      return '<div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">'+cards+'</div>';
     }
 
-    function renderCharacter(){
-      const s = GS.stats;
-      const statRow = (k, label)=>`
-        <tr><td>${label}</td><td>${s[k]}</td><td>${k==='strength'?'Affects carry capacity':k==='agility'?'Reduces travel risk':k==='hacking'?'Cuts loan interest':k==='charisma'?'Improves trade prices':'Lowers hospital costs'}</td>
-        ${GS.statPoints>0?`<td><button class="btn" data-up="${k}">+1</button></td>`:'<td></td>'}
-        </tr>`;
-
-      setPanel(`
-        <div class="grid cols-2">
-          <div class="card">
-            <div class="title"><h2>Runner</h2></div>
-            <div class="k">Name</div>
-            <div style="display:flex; gap:8px; align-items:center">
-              <input id="char-name" value="${GS.name}"><button class="btn" id="btn-rename">Rename</button>
-            </div>
-            <div style="height:10px"></div>
-            <div class="k">Level ${GS.level} • XP ${GS.xp} • Stat points <span class="pill">${GS.statPoints}</span></div>
-          </div>
-          <div class="card">
-            <div class="title"><h2>Stats</h2></div>
-            <table>
-              <thead><tr><th>Stat</th><th>Value</th><th>Effect</th><th></th></tr></thead>
-              <tbody>
-                ${statRow('strength','Strength')}
-                ${statRow('agility','Agility')}
-                ${statRow('hacking','Hacking')}
-                ${statRow('charisma','Charisma')}
-                ${statRow('tech','Tech')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `);
-
-      $('#btn-rename').onclick = ()=>{ const v=$('#char-name').value.trim(); if(v){ GS.name=v; log(`New handle: <b>${GS.name}</b>`); }}
-      $$('#panel [data-up]').forEach(b=> b.onclick = ()=>{ if(GS.statPoints>0){ GS.stats[b.getAttribute('data-up')]++; GS.statPoints--; renderCharacter(); renderHUD(); }});
+    // ----- Store / Bank / Hospital / Character / Hub (unchanged from fix2, minor grooming) -----
+    function isOwned(kind, id){
+      if(kind==='property') return GS.gear.property.indexOf(id)>=0;
+      if(kind==='lux') return GS.gear.lux.indexOf(id)>=0;
+      var g = GS.gear[kind];
+      return g && g.id===id;
     }
-
-    function renderQuests(){
-      setPanel(`
-        <div class="card">
-          <div class="title"><h2>Contracts</h2></div>
-          <div class="k">Starter gigs rotate daily.</div>
-          <div style="height:8px"></div>
-          <div id="q-list"></div>
-        </div>
-      `);
-
-      // Simple daily quest templates
-      const contracts = [
-        { id:'q1', text:'Deliver 5 × Synth Meds to Helix Arcology', need:{item:'meds', qty:5}, loc:'arcology', reward: 320 },
-        { id:'q2', text:'Sell 10 × Soy Rations anywhere', need:{item:'food', qty:10}, loc:null, reward: 200 },
-        { id:'q3', text:'Offload 3 × Black ICE Chips in Apex Spire', need:{item:'chips', qty:3}, loc:'spire', reward: 600 },
-      ];
-      const box = $('#q-list');
-      contracts.forEach(q=>{
-        const el = document.createElement('div'); el.className='card';
-        el.innerHTML = `<div class="title"><h2>${q.text}</h2><span class="pill">Reward ${fmt(q.reward)}</span></div>
-          <button class="btn" data-turnin="${q.id}">Turn In</button>`;
-        box.appendChild(el);
-      });
-      $$('#panel [data-turnin]').forEach(b=> b.onclick = ()=>{
-        const id=b.getAttribute('data-turnin'); const q = contracts.find(x=>x.id===id);
-        if(q.loc && GS.location!==q.loc){ log('Wrong district for this contract.', 'bad'); return; }
-        const have = GS.inventory[q.need.item]||0; if(have<q.need.qty){ log('You lack the required goods.', 'bad'); return; }
-        GS.inventory[q.need.item] = have - q.need.qty; if(GS.inventory[q.need.item]<=0) delete GS.inventory[q.need.item];
-        GS.credits += q.reward; GS.xp += q.reward/5; levelCheck(); log(`Contract completed: +<b>${fmt(q.reward)}</b> credits.`, 'good'); renderHUD(); renderInventory();
-      });
-    }
-
-    function renderBank(){
-      setPanel(`
-        <div class="grid cols-2">
-          <div class="card">
-            <div class="title"><h2>Bank</h2><span class="pill">On hand: ${fmt(GS.credits)}</span></div>
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px">
-              <input id="dep-amt" type="number" min="1" placeholder="Amount">
-              <button class="btn" id="dep">Deposit</button>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center">
-              <input id="wd-amt" type="number" min="1" placeholder="Amount">
-              <button class="btn" id="wd">Withdraw</button>
-            </div>
-            <div class="k" style="margin-top:6px">Savings: <b>${fmt(GS.bank)}</b></div>
-          </div>
-          <div class="card">
-            <div class="title"><h2>Loan Shark</h2><span class="pill">Debt: ${fmt(GS.debt)}</span></div>
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px">
-              <input id="loan-amt" type="number" min="1" placeholder="Borrow amount">
-              <button class="btn warn" id="loan">Borrow</button>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center">
-              <input id="repay-amt" type="number" min="1" placeholder="Repay amount">
-              <button class="btn" id="repay">Repay</button>
-            </div>
-            <div class="k" style="margin-top:6px">Daily interest ~<b>${((0.03 - Math.min(0.02, GS.stats.hacking*0.001))*100).toFixed(1)}%</b></div>
-          </div>
-        </div>
-      `);
-      $('#dep').onclick = ()=> deposit(parseInt($('#dep-amt').value||'0',10));
-      $('#wd').onclick = ()=> withdraw(parseInt($('#wd-amt').value||'0',10));
-      $('#loan').onclick = ()=> borrow(parseInt($('#loan-amt').value||'0',10));
-      $('#repay').onclick = ()=> repay(parseInt($('#repay-amt').value||'0',10));
-    }
-
-    function renderHospital(){
-      setPanel(`
-        <div class="card">
-          <div class="title"><h2>Clinic</h2><span class="pill">Health ${GS.health}/${GS.maxHealth}</span></div>
-          <p>Patch yourself up. Costs scale with missing health; <b>Tech</b> reduces the bill.</p>
-          <button class="btn primary" id="heal">Heal to Full</button>
-        </div>
-      `);
-      $('#heal').onclick = healAll;
-    }
-
-    function renderStocks(){
-      const rows = STOCKS.map(s=>{
-        const have = GS.stocks[s.id]||0;
-        return `<tr>
-          <td>${s.name}</td>
-          <td>${fmt(s.price)}</td>
-          <td>${have}</td>
-          <td style="display:flex; gap:6px; align-items:center">
-            <input type="number" min="1" value="1" id="sq-${s.id}" style="width:86px">
-            <button class="btn" data-buys="${s.id}">Buy</button>
-            <button class="btn" data-sells="${s.id}">Sell</button>
-          </td>
-        </tr>`;
-      }).join('');
-
-      setPanel(`
-        <div class="grid cols-2">
-          <div class="card">
-            <div class="title"><h2>Megacorp Ticker</h2><button class="btn" id="s-refresh">Advance Day</button></div>
-            <table><thead><tr><th>Stock</th><th>Price</th><th>Owned</th><th>Trade</th></tr></thead><tbody>${rows}</tbody></table>
-          </div>
-          <div class="card">
-            <div class="title"><h2>Notes</h2></div>
-            <div class="k">Stocks are legal but volatile. Advancing the day also updates markets city‑wide.</div>
-          </div>
-        </div>
-      `);
-      $('#s-refresh').onclick = ()=>{ advanceDay('market close'); renderStocks(); };
-      $$('#panel [data-buys]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-buys'); const q=parseInt($(`#sq-${id}`).value||'1',10); buyStock(id,q);});
-      $$('#panel [data-sells]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-sells'); const q=parseInt($(`#sq-${id}`).value||'1',10); sellStock(id,q);});
-    }
-
-    // ---------- Character Creation ----------
-    function showCharCreate(){
-      const modal = $('#modal-cc'); modal.style.display='flex';
-      const pointsEl = $('#cc-points'); let points = 5;
-      const base = { strength:5, agility:5, hacking:5, charisma:5, tech:5, health:100 };
-      const cur = {...base};
-
-      function renderAlloc(){
-        pointsEl.textContent = `${points} pts`;
-        const rows = ['strength','agility','hacking','charisma','tech'].map(k=>`
-          <div style="display:flex; align-items:center; gap:8px; margin:6px 0">
-            <div style="width:120px">${k.charAt(0).toUpperCase()+k.slice(1)}</div>
-            <button class="btn" data-down="${k}" ${cur[k]<=1?'disabled':''}>–</button>
-            <div style="min-width:28px; text-align:center">${cur[k]}</div>
-            <button class="btn" data-up="${k}" ${points<=0?'disabled':''}>+</button>
-          </div>`).join('');
-        $('#cc-stats').innerHTML = rows;
-        $$('#cc-stats [data-up]').forEach(b=> b.onclick = ()=>{ const k=b.getAttribute('data-up'); if(points>0){ cur[k]++; points--; renderAlloc(); }});
-        $$('#cc-stats [data-down]').forEach(b=> b.onclick = ()=>{ const k=b.getAttribute('data-down'); if(cur[k]>1){ cur[k]--; points++; renderAlloc(); }});
+    function mergedLux(){
+      var base = CONFIG.store.lux.slice();
+      for(var i=0;i<META.unlocks.items.length;i++){
+        var id = META.unlocks.items[i];
+        if(!base.find(function(x){return x.id===id;})){
+          base.push({id:id, name:id, cost:1500, charisma:1});
+        }
       }
-      renderAlloc();
+      return base;
+    }
+    function storeSection(title, list, buyKey){
+      var rows = list.map(function(it){
+        var owned = isOwned(buyKey, it.id) ? ' (owned)' : '';
+        return '<tr>'+
+          '<td class="font-semibold">'+it.name+owned+'</td>'+
+          '<td>'+c(it.cost)+'</td>'+
+          '<td><button class="btn" data-action="buyGear" data-kind="'+buyKey+'" data-id="'+it.id+'">Buy</button></td>'+
+        '</tr>';
+      }).join('');
+      return '<div class="glass rounded-xl p-3">'+
+        '<div class="font-semibold mb-2">'+title+'</div>'+
+        '<table><thead><tr><th>Item</th><th>Cost</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>'+
+      '</div>';
+    }
+    function renderStore(){
+      var S = CONFIG.store;
+      var L = mergedLux();
+      return '<h2 class="text-xl mb-3">Character Store</h2>'+
+        '<div class="grid md:grid-cols-2 gap-3">'+
+          storeSection('Weapons', S.weapons, 'weapon')+
+          storeSection('Armor', S.armor, 'armor')+
+          storeSection('Capacity Gear', S.gear, 'pack')+
+          storeSection('Vehicles', S.vehicles, 'vehicle')+
+          storeSection('Property', S.property, 'property')+
+          storeSection('Luxury / Status', L, 'lux')+
+        '</div>';
+    }
+    function renderBank(){
+      return '<div class="grid md:grid-cols-2 gap-3">'+
+        '<div class="glass rounded-xl p-3">'+
+          '<div class="font-semibold mb-2">Accounts</div>'+
+          '<div>Balance: '+c(GS.bank.balance)+'</div>'+
+          '<div>Debt: '+c(GS.bank.debt)+'</div>'+
+          '<div class="mt-2 space-x-2">'+
+            '<button class="btn" data-action="deposit">Deposit 100</button>'+
+            '<button class="btn" data-action="withdraw">Withdraw 100</button>'+
+            '<button class="btn" data-action="borrow">Borrow 100</button>'+
+            '<button class="btn" data-action="repay">Repay 100</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="glass rounded-xl p-3">'+
+          '<div class="font-semibold mb-2">Wealth & Heat</div>'+
+          '<div>Heat: '+GS.heat+'</div>'+
+          '<div>Wealth Score: '+c(wealthScore())+'</div>'+
+        '</div>'+
+      '</div>';
+    }
+    function renderHospital(){
+      return '<div class="glass rounded-xl p-3">'+
+        '<div class="font-semibold mb-2">Hospital</div>'+
+        '<div>HP: '+GS.hp+'</div>'+
+        '<div class="space-x-2 mt-2">'+
+          '<button class="btn" data-action="heal">Basic Heal ( '+c(60)+' )</button>'+
+          '<button class="btn" data-action="hideheal">Stitch & Hide ( '+c(160)+' )</button>'+
+        '</div>'+
+      '</div>';
+    }
+    function renderCharacter(){
+      var s = GS.stats;
+      return '<div class="grid md:grid-cols-2 gap-3">'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Stats</div>'+
+          '<div>STR '+s.strength+' • AGI '+s.agility+' • CHA '+s.charisma+' • LUCK '+s.luck+'</div>'+
+          '<div class="text-sm mt-2">Points: '+GS.points+' • Background: '+GS.background+'</div>'+
+        '</div>'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Gear</div>'+
+          '<div>Weapon: '+(GS.gear.weapon?GS.gear.weapon.name:'—')+'</div>'+
+          '<div>Armor: '+(GS.gear.armor?GS.gear.armor.name:'—')+'</div>'+
+          '<div>Pack: '+(GS.gear.pack?GS.gear.pack.name:'—')+'</div>'+
+          '<div>Vehicle: '+(GS.gear.vehicle?GS.gear.vehicle.name:'—')+'</div>'+
+          '<div>Property: '+(GS.gear.property.join(', ')||'—')+'</div>'+
+          '<div>Luxury: '+(GS.gear.lux.join(', ')||'—')+'</div>'+
+        '</div>'+
+      '</div>';
+    }
+    function renderHub(){
+      function button(disabled, label, data){
+        return '<button class="btn '+(disabled?'opacity-40 cursor-not-allowed':'')+'" '+(disabled?'disabled':'')+
+               (data||'')+'>'+label+'</button>';
+      }
+      var offersBg = [
+        {key:'Smuggler', cost:3},
+        {key:'ExCop', cost:3},
+        {key:'Broker', cost:3}
+      ];
+      var offersAug = [
+        {key:'OcularHUD', cost:2},
+        {key:'MuscleWeave', cost:2},
+        {key:'ReflexChip', cost:2}
+      ];
+      var bgsHtml = offersBg.map(function(o){
+        var owned = META.unlocks.backgrounds.indexOf(o.key)>=0;
+        var dis = owned || META.legacyPoints<o.cost;
+        var label = owned ? (o.key+' ✓') : (o.key+' — '+o.cost+' LP');
+        return '<div>'+button(dis, label, 'data-action="buyBG" data-key="'+o.key+'" data-cost="'+o.cost+'"')+' <span class="text-xs text-sky-200/80">'+CONFIG.backgrounds[o.key].desc+'</span></div>';
+      }).join('');
+      var augHtml = offersAug.map(function(o){
+        var owned = META.unlocks.augments.indexOf(o.key)>=0;
+        var dis = owned || META.legacyPoints<o.cost;
+        var label = owned ? (o.key+' ✓') : (o.key+' — '+o.cost+' LP');
+        return '<div>'+button(dis, label, 'data-action="buyAug" data-key="'+o.key+'" data-cost="'+o.cost+'"')+' <span class="text-xs text-sky-200/80">'+CONFIG.augments[o.key].desc+'</span></div>';
+      }).join('');
+      var codexKeys = Object.keys(META.codex).filter(function(k){return META.codex[k];}).sort();
+      var codexHtml = codexKeys.length? codexKeys.map(function(k){return '<li>'+k.replace('saw_','Encounter: ').replace('news_','News: ')+'</li>';}).join('') : '<li>Empty</li>';
 
-      $('#cc-close').onclick = ()=>{ modal.style.display='none'; };
-      $('#cc-start').onclick = ()=>{
-        GS.name = ($('#cc-name').value.trim()||'Rook');
-        const bg = $('#cc-bg').value;
-        GS.stats = { strength:cur.strength, agility:cur.agility, hacking:cur.hacking, charisma:cur.charisma, tech:cur.tech };
-        BACKGROUND_BONUS[bg]?.(GS.stats);
-        GS.maxHealth = 100 + Math.max(0, GS.stats.strength-5)*2 + (bg==='nomad'?10:0);
-        GS.health = GS.maxHealth;
-        GS.capacity = capacityFromStrength();
-        modal.style.display='none';
-        log(`Welcome, <b>${GS.name}</b>. Background: <b>${bg}</b>.`);
-        renderHUD();
-      };
+      // Contracts UI
+      GS.contracts = GS.contracts || {available:[], active:[]};
+      // prune expired available offers
+      GS.contracts.available = GS.contracts.available.filter(function(c){ return c.expiresAt > GS.day; });
+      var availHtml = GS.contracts.available.length ? GS.contracts.available.map(function(c){
+        var destName = (CONFIG.districts.find(function(d){return d.id===c.dest;})||{}).name || c.dest;
+        return '<div class="glass p-2 mb-2">'+
+          '<div class="font-semibold">'+c.label+'</div>'+ 
+          '<div class="text-xs">Dest: '+destName+' • Reward: '+c.reward+' • Expires: day '+c.expiresAt+'</div>'+ 
+          '<div class="mt-2"><button class="btn" data-action="acceptContract" data-id="'+c.id+'">Accept</button></div>'+ 
+        '</div>';
+      }).join('') : '<div class="text-sm text-sky-200/70">No current offers</div>';
+
+      var activeHtml = GS.contracts.active.length ? GS.contracts.active.map(function(c){
+        var progress = (GS.inventory[c.itemId]||0) >= c.qty ? 'Ready' : 'In Progress';
+        return '<div class="glass p-2 mb-2">'+
+          '<div class="font-semibold">'+c.label+' <span class="text-xs">('+progress+')</span></div>'+ 
+          '<div class="text-xs">Reward: '+c.reward+' • Expires: day '+c.expiresAt+'</div>'+ 
+          '<div class="mt-2 space-x-2"><button class="btn" data-action="fulfillContract" data-id="'+c.id+'">Fulfill</button><button class="btn" data-action="abandonContract" data-id="'+c.id+'">Abandon</button></div>'+ 
+        '</div>';
+      }).join('') : '<div class="text-sm text-sky-200/70">No active contracts</div>';
+
+      return '<div class="grid md:grid-cols-2 gap-3">'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Legacy</div>'+
+          '<div>Legacy Points: '+META.legacyPoints+'</div>'+
+          '<div>High Score: '+c(META.highScore)+'</div>'+
+          '<div class="mt-2"><button class="btn" data-action="startRun">Start New Run</button></div>'+
+        '</div>'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Unlock Backgrounds</div>'+ bgsHtml +
+        '</div>'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Buy Augments</div>'+ augHtml +
+        '</div>'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Codex</div>'+
+          '<ul class="list-disc pl-5">'+codexHtml+'</ul>'+ 
+        '</div>'+
+        // Contracts moved to dedicated tab
+      '</div>';
     }
 
-    // ---------- Save / Load ----------
+    // Extracted contracts renderer
+    function renderContracts(){
+      GS.contracts = GS.contracts || {available:[], active:[]};
+      // prune expired available offers
+      GS.contracts.available = GS.contracts.available.filter(function(c){ return c.expiresAt > GS.day; });
+      var availHtml = GS.contracts.available.length ? GS.contracts.available.map(function(c){
+        var destName = (CONFIG.districts.find(function(d){return d.id===c.dest;})||{}).name || c.dest;
+        return '<div class="glass p-2 mb-2">'+
+          '<div class="font-semibold">'+c.label+'</div>'+ 
+          '<div class="text-xs">Dest: '+destName+' • Reward: '+c.reward+' • Expires: day '+c.expiresAt+'</div>'+ 
+          '<div class="mt-2"><button class="btn" data-action="acceptContract" data-id="'+c.id+'">Accept</button></div>'+ 
+        '</div>';
+      }).join('') : '<div class="text-sm text-sky-200/70">No current offers</div>';
+
+      var activeHtml = GS.contracts.active.length ? GS.contracts.active.map(function(c){
+        var progress = (GS.inventory[c.itemId]||0) >= c.qty ? 'Ready' : 'In Progress';
+        return '<div class="glass p-2 mb-2">'+
+          '<div class="font-semibold">'+c.label+' <span class="text-xs">('+progress+')</span></div>'+ 
+          '<div class="text-xs">Reward: '+c.reward+' • Expires: day '+c.expiresAt+'</div>'+ 
+          '<div class="mt-2 space-x-2"><button class="btn" data-action="fulfillContract" data-id="'+c.id+'">Fulfill</button><button class="btn" data-action="abandonContract" data-id="'+c.id+'">Abandon</button></div>'+ 
+        '</div>';
+      }).join('') : '<div class="text-sm text-sky-200/70">No active contracts</div>';
+
+      return '<div class="grid md:grid-cols-2 gap-3">'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Contracts - Available</div>'+ availHtml +
+        '</div>'+
+        '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold mb-2">Contracts - Active</div>'+ activeHtml +
+        '</div>'+
+      '</div>';
+    }
+
+  // =================== INTERACTION ====================
+  // User input handlers and click delegation (data-action)
+  // ----------------------------------------------------
+    document.addEventListener('click', function(e){
+      var t = e.target.closest('button'); if(!t) return;
+      var action = t.dataset.action;
+
+      if(t.classList.contains('tab')){ setActiveTab(t.dataset.tab); return; }
+
+      if(action==='buy'){
+        var id = t.dataset.id;
+        // one unit per click (market depth + impact handled inside)
+        transactBuy(id, CONFIG.market.maxUnitsPerClick);
+        render(); saveGame();
+      }
+      if(action==='sell'){
+        var id2 = t.dataset.id;
+        transactSell(id2, CONFIG.market.maxUnitsPerClick);
+        render(); saveGame();
+      }
+      if(action==='buyQty'){
+        var idb = t.dataset.id;
+        var inp = document.querySelector('input.qty[data-id="'+idb+'"]');
+        var q = inp ? Math.max(1, parseInt(inp.value,10)||1) : CONFIG.market.maxUnitsPerClick;
+        transactBuy(idb, q);
+        render(); saveGame();
+      }
+      if(action==='buySelected'){
+        var sel = document.getElementById('trade-item-select'); if(!sel) return; var id = sel.value; var q = Math.max(1, parseInt(document.getElementById('trade-qty').value,10)||1); transactBuy(id,q); render(); if(PREFS.autosave) saveGame();
+      }
+      if(action==='sellSelected'){
+        var sel2 = document.getElementById('trade-item-select'); if(!sel2) return; var id2 = sel2.value; var q2 = Math.max(1, parseInt(document.getElementById('trade-qty').value,10)||1); transactSell(id2,q2); render(); if(PREFS.autosave) saveGame();
+      }
+      if(action==='buyMaxSelect'){
+        var sel3 = document.getElementById('trade-item-select'); if(!sel3) return; buyMax(sel3.value); render(); if(PREFS.autosave) saveGame();
+      }
+      if(action==='toggleFavorite'){
+        // Toggle favorite for current district (GS.location) + selected item
+        var selF = document.getElementById('trade-item-select'); if(!selF) return; var iid = selF.value; var did = GS.location; var key = did+'|'+iid; var favs = JSON.parse(localStorage.getItem('ED_FAVS')||'[]'); var idx = favs.indexOf(key);
+        if(idx===-1){ favs.push(key); logMessage('Added favorite.','good'); }
+        else { favs.splice(idx,1); logMessage('Removed favorite.','warn'); }
+        localStorage.setItem('ED_FAVS', JSON.stringify(favs)); render();
+      }
+      // (legacy district-select handlers removed when UI reverted)
+      if(action==='switchTradeTab'){
+        var tname = t.dataset.tab; // simple client-side tab state could be stored on window
+        window._TRADE_TAB = tname; render();
+      }
+      if(action==='buyAll'){
+        var idba = t.dataset.id;
+        confirmBulkTrade('buyAll', idba, function(){ transactBuyAll(idba); render(); if(PREFS.autosave) saveGame(); });
+      }
+      if(action==='sellQty'){
+        var ids = t.dataset.id;
+        var inps = document.querySelector('input.qty[data-id="'+ids+'"]');
+        var q2 = inps ? Math.max(1, parseInt(inps.value,10)||1) : CONFIG.market.maxUnitsPerClick;
+        transactSell(ids, q2);
+        render(); saveGame();
+      }
+      if(action==='sellAll'){
+        var idsa = t.dataset.id;
+        confirmBulkTrade('sellAll', idsa, function(){ transactSellAll(idsa); render(); saveGame(); });
+      }
+      if(action==='go'){ travel(t.dataset.id); }
+  if(action==='buyMax'){ buyMax(t.dataset.id); render(); }
+      if(action==='deposit'){ if(GS.credits>=100){ GS.credits-=100; GS.bank.balance+=100; render(); saveGame(); } }
+      if(action==='withdraw'){ if(GS.bank.balance>=100){ GS.bank.balance-=100; GS.credits+=100; render(); saveGame(); } }
+      if(action==='borrow'){ GS.bank.debt+=100; GS.credits+=100; render(); saveGame(); }
+      if(action==='repay'){ if(GS.credits>=100){ GS.credits-=100; GS.bank.debt=Math.max(0,GS.bank.debt-100); render(); saveGame(); } }
+      if(action==='heal'){ if(GS.credits>=60){ GS.credits-=60; GS.hp=Math.min(30,GS.hp+10); render(); saveGame(); } }
+      if(action==='hideheal'){ if(GS.credits>=160){ GS.credits-=160; GS.hp=Math.min(30,GS.hp+12); GS.heat=Math.max(0,GS.heat-5); render(); saveGame(); } }
+      if(action==='stat'){ var k=t.dataset.k; if(GS.points>0){ GS.stats[k]++; GS.points--; render(); saveGame(); } }
+      if(action==='buyGear'){
+        var kind = t.dataset.kind, gid = t.dataset.id;
+        buyGear(kind, gid);
+        render(); saveGame();
+      }
+      if(t.id==='newrun'){ if(confirm('Start a new run? Current run will end.')){ endRun('abandon'); } }
+      if(t.id==='save'){ saveGame(); }
+      if(t.id==='load'){ loadGame(); }
+      if(t.id==='run-smoke'){
+        // Shift+click runs the contract smoke flow; normal click runs the original smoke
+        if(window.event && window.event.shiftKey){ runContractSmokeTest(); }
+        else { runInPageSmokeTest(); }
+      }
+      if(t.id==='export-save'){ exportSave(); }
+      if(t.id==='import-save'){ importSave(); }
+      if(t.id==='clear-log'){ clearLog(); }
+      if(t.id==='settings-toggle'){ showSettings(); }
+      if(action==='startRun'){ newRun(); setActiveTab('trade'); }
+      if(action==='buyBG'){
+        var key = t.dataset.key, cost = parseInt(t.dataset.cost,10);
+        if(META.unlocks.backgrounds.indexOf(key)>=0) return;
+        if(META.legacyPoints < cost){ logMessage('Not enough Legacy Points.','bad'); return; }
+        META.legacyPoints -= cost;
+        META.unlocks.backgrounds.push(key);
+        saveMeta(); render();
+      }
+      if(action==='buyAug'){
+        var keyA = t.dataset.key, costA = parseInt(t.dataset.cost,10);
+        if(META.unlocks.augments.indexOf(keyA)>=0) return;
+        if(META.legacyPoints < costA){ logMessage('Not enough Legacy Points.','bad'); return; }
+        META.legacyPoints -= costA;
+        META.unlocks.augments.push(keyA);
+        saveMeta(); render();
+      }
+      if(action==='acceptContract'){
+        var cid = t.dataset.id;
+        GS.contracts = GS.contracts || {available:[], active:[]};
+        var idx = GS.contracts.available.findIndex(function(x){return x.id===cid;});
+        if(idx===-1){ logMessage('Offer not found.','bad'); return; }
+        var offer = GS.contracts.available.splice(idx,1)[0];
+        GS.contracts.active.push(offer);
+        logMessage('Accepted contract: '+offer.label,'good'); render(); saveGame();
+      }
+      if(action==='abandonContract'){
+        var cid2 = t.dataset.id;
+        GS.contracts = GS.contracts || {available:[], active:[]};
+        var id2 = GS.contracts.active.findIndex(function(x){return x.id===cid2;});
+        if(id2===-1){ logMessage('Active contract not found.','bad'); return; }
+        var rem = GS.contracts.active.splice(id2,1)[0];
+        logMessage('Abandoned: '+rem.label,'warn'); render(); saveGame();
+      }
+      if(action==='fulfillContract'){
+        var cid3 = t.dataset.id;
+        GS.contracts = GS.contracts || {available:[], active:[]};
+        var j = GS.contracts.active.findIndex(function(x){return x.id===cid3;});
+        if(j===-1){ logMessage('Active contract not found.','bad'); return; }
+        var con = GS.contracts.active[j];
+        // require player to be at the contract destination
+        if(GS.location !== con.dest){
+          var destName2 = (CONFIG.districts.find(function(d){return d.id===con.dest;})||{}).name || con.dest;
+          logMessage('You must be at '+destName2+' to deliver this contract. Travel there to fulfill.','bad');
+          return;
+        }
+        var have = GS.inventory[con.itemId]||0;
+        if(have < con.qty){ logMessage('Contract not ready. Collect required goods.','bad'); return; }
+        // remove items
+        GS.inventory[con.itemId] = GS.inventory[con.itemId] - con.qty;
+        if(GS.inventory[con.itemId] <= 0) delete GS.inventory[con.itemId];
+        GS.credits += con.reward;
+        GS.contracts.active.splice(j,1);
+        logMessage('Contract fulfilled: '+con.label+' • +' + c(con.reward),'good'); render(); saveGame();
+      }
+    });
+
+    // ------------------ SECTION INDEX (for maintainers) ------------------
+    // The following `Modules` object is a lightweight directory of key functions
+    // grouped for discoverability. It does NOT change behaviour — it just exposes
+    // references so you can quickly see or call related functions from the console.
+    // Add new entries here when you add features.
+    try{
+      window.Modules = window.Modules || {};
+      window.Modules.Market = {
+        initMarket: initMarket,
+        rollDailyDrift: rollDailyDrift,
+        basePriceFor: basePriceFor,
+        midPrice: midPrice,
+        askPrice: askPrice,
+        bidPrice: bidPrice,
+        restockAll: restockAll
+      };
+      window.Modules.Trade = {
+        transactBuy: transactBuy,
+        transactBuyAll: transactBuyAll,
+        transactSell: transactSell,
+        transactSellAll: transactSellAll,
+        buyMax: buyMax,
+        confirmBulkTrade: confirmBulkTrade
+      };
+      window.Modules.UI = {
+        render: render,
+        renderTrade: renderTrade,
+        renderTravel: renderTravel,
+        renderHub: renderHub,
+        renderContracts: renderContracts,
+        setActiveTab: setActiveTab,
+        updateUI: updateUI
+      };
+      window.Modules.Save = {
+        saveGame: saveGame,
+        loadGame: loadGame,
+        migrateSave: migrateSave,
+        exportSave: exportSave,
+        importSave: importSave
+      };
+      window.Modules.Contracts = {
+        generateContracts: generateContracts,
+        acceptContract: function(id){ document.querySelector('button[data-action="acceptContract"][data-id="'+id+'"]').click(); }
+      };
+    }catch(_e){}
+
+  // ================== SMOKE TESTS (IN-PAGE) ==================
+  // Lightweight UI-driven smoke tests used during development
+  // ---------------------------------------------------------
+    async function runInPageSmokeTest(){
+      try{
+        logClear();
+        logMessage('Smoke: Starting...', 'good');
+        // Ensure META/load
+        try{ loadMeta(); }catch(e){}
+        // Start a run if none
+        if(!GS || !GS.market || Object.keys(GS.market).length===0){ newRun(); }
+        updateUI();
+
+        // Save
+        saveGame();
+        logMessage('Smoke: Saved OK', 'good');
+
+        // Buy first available item
+        setActiveTab('trade');
+        await new Promise(r=>setTimeout(r,150));
+        // Try to click a single-unit buy. Support both legacy `buy` and new `buyQty` buttons.
+        var buy = document.querySelector('button[data-action="buy"]') || document.querySelector('button[data-action="buyQty"]');
+        if(buy){
+          try{
+            if(buy.dataset.action==='buyQty'){
+              var id = buy.dataset.id;
+              var inp = document.querySelector('input.qty[data-id="'+id+'"]');
+              if(inp){ inp.value = '1'; }
+            }
+          }catch(_e){}
+          buy.click(); logMessage('Smoke: Clicked Buy', 'good');
+        } else {
+          var fallback = document.querySelectorAll('button[data-action="buyQty"]')[0];
+          if(fallback){ fallback.click(); logMessage('Smoke: Clicked BuyQty fallback', 'good'); }
+          else logMessage('Smoke: No Buy button found', 'bad');
+        }
+        await new Promise(r=>setTimeout(r,250));
+
+        // Travel
+        setActiveTab('travel');
+        await new Promise(r=>setTimeout(r,150));
+        var go = document.querySelector('button[data-action="go"]');
+        if(go){ go.click(); logMessage('Smoke: Traveled', 'good'); } else logMessage('Smoke: No Travel button', 'bad');
+        await new Promise(r=>setTimeout(r,500));
+
+        // Load
+        loadGame();
+        await new Promise(r=>setTimeout(r,200));
+        logMessage('Smoke: Load attempted', 'good');
+
+        logMessage('Smoke: Finished', 'good');
+        updateUI();
+      }catch(err){ console.error(err); logMessage('Smoke failed: '+String(err),'bad'); }
+    }
+
+    // Automated smoke test specifically for contract flow
+    async function runContractSmokeTest(){
+      try{
+        logClear(); logMessage('Contract Smoke: starting...', 'good');
+        // Ensure meta and run
+        try{ loadMeta(); }catch(_e){}
+        if(!GS || !GS.market || Object.keys(GS.market).length===0){ newRun(); }
+        updateUI();
+
+        // Ensure there is an available contract
+        setActiveTab('hub'); await new Promise(r=>setTimeout(r,120));
+        // If none, generate and re-render
+        if(!GS.contracts || !GS.contracts.available || GS.contracts.available.length===0){ generateContracts(); render(); }
+        await new Promise(r=>setTimeout(r,120));
+
+        var firstOfferBtn = document.querySelector('button[data-action="acceptContract"]');
+        if(!firstOfferBtn){ logMessage('No contract offers found', 'bad'); return false; }
+        // Capture offer data from GS (first available)
+        var offerId = firstOfferBtn.dataset.id; var offerObj = (GS.contracts.available||[]).find(function(x){return x.id===offerId;});
+        if(!offerObj){ logMessage('Offer object not found in GS', 'bad'); return false; }
+
+        // Accept it
+        firstOfferBtn.click(); logMessage('Accepted contract: '+offerObj.label, 'good'); await new Promise(r=>setTimeout(r,140));
+
+        // Buy required goods (attempt to buy qty from market or via buyAll as needed)
+        setActiveTab('trade'); await new Promise(r=>setTimeout(r,140));
+        var need = offerObj.qty || 1; var itemId = offerObj.itemId;
+        var inp = document.querySelector('input.qty[data-id="'+itemId+'"]');
+        if(inp){ inp.value = String(need); }
+        var buyBtn = document.querySelector('button[data-action="buyQty"][data-id="'+itemId+'"]');
+        if(buyBtn){ buyBtn.click(); logMessage('Bought required goods via buyQty', 'good'); }
+        else {
+          var buyAll = document.querySelector('button[data-action="buyAll"][data-id="'+itemId+'"]');
+          if(buyAll){ buyAll.click(); logMessage('Bought goods via Buy All', 'good'); }
+          else { logMessage('No buy button for item '+itemId, 'bad'); return false; }
+        }
+        await new Promise(r=>setTimeout(r,220));
+
+        // Travel to destination
+        setActiveTab('travel'); await new Promise(r=>setTimeout(r,120));
+        var destBtn = document.querySelector('button[data-action="go"][data-id="'+offerObj.dest+'"]');
+        if(destBtn){ destBtn.click(); logMessage('Traveled to destination: '+offerObj.dest, 'good'); }
+        else { logMessage('Destination button not found for '+offerObj.dest, 'bad'); return false; }
+        await new Promise(r=>setTimeout(r,320));
+
+        // Attempt to fulfill
+        setActiveTab('hub'); await new Promise(r=>setTimeout(r,140));
+        var fulfillBtn = document.querySelector('button[data-action="fulfillContract"][data-id="'+offerObj.id+'"]');
+        if(!fulfillBtn){ logMessage('Fulfill button not present', 'bad'); return false; }
+        fulfillBtn.click(); await new Promise(r=>setTimeout(r,180));
+
+        // Check credits increased
+        logMessage('Contract Smoke: finished. Credits: '+c(GS.credits), 'good');
+        saveGame(); return true;
+      }catch(err){ console.error(err); logMessage('Contract Smoke failed: '+String(err),'bad'); return false; }
+    }
+
+    function buyGear(kind, id){
+      var storeKeyMap = {weapon:'weapons', vehicle:'vehicles', pack:'gear', lux:'lux', armor:'armor', property:'property'};
+      var cat;
+      if(kind==='lux'){ cat = mergedLux(); }
+      else{ var key = storeKeyMap[kind] || kind; cat = (key==='gear') ? CONFIG.store.gear : CONFIG.store[key]; }
+      if(!cat || !Array.isArray(cat)){ logMessage('Store category not found for '+kind,'bad'); return; }
+      var it = cat.find(function(x){return x.id===id;}); if(!it){ logMessage('Item not found.','bad'); return; }
+      if(GS.credits < it.cost){ logMessage('Not enough credits.','bad'); return; }
+      GS.credits -= it.cost;
+      if(kind==='property'){ GS.gear.property.push(it.id); GS.stash[it.id] = GS.stash[it.id]||{}; }
+      else if(kind==='lux'){ GS.gear.lux.push(it.id); if(it.charisma) GS.stats.charisma += it.charisma; }
+      else { GS.gear[kind] = it; }
+      logMessage('Purchased '+it.name+'.', 'good');
+      updateUI();
+    }
+
+    // ------------------ MODALS ------------------
+    function showBackgroundPicker(){
+      var bgs = META.unlocks.backgrounds.slice();
+      var html = bgs.map(function(k){
+        var b = CONFIG.backgrounds[k];
+        return '<div class="glass p-3 rounded-xl">'+
+          '<div class="font-semibold">'+k+'</div>'+
+          '<div class="text-sm text-sky-200/80">'+b.desc+'</div>'+
+          '<div class="text-xs mt-1">Start: '+c(b.start.credits)+' • STR '+b.start.stats.strength+' • AGI '+b.start.stats.agility+' • CHA '+b.start.stats.charisma+' • LUCK '+b.start.stats.luck+'</div>'+
+          '<button class="btn mt-2" data-action="pickBG" data-k="'+k+'">Choose</button>'+
+        '</div>';
+      }).join('');
+      var div = document.createElement('div');
+  div.className = 'fixed inset-0 z-50 p-4 overflow-auto';
+  div.style.background = 'radial-gradient(ellipse at center, rgba(2,6,12,0.6), rgba(0,0,0,0.9))';
+  div.innerHTML = '<div class="max-w-3xl mx-auto modal-content" style="transform:translateY(-6px); opacity:0; animation:modal-in .18s forwards"><h2 class="text-xl mb-3">Choose Background</h2><div class="grid md:grid-cols-2 gap-3">'+html+'</div></div>';
+      document.body.appendChild(div);
+      document.documentElement.classList.add('locked');
+      div.addEventListener('click', function(e){
+        var b = e.target.closest('button'); if(!b) return;
+        if(b.dataset.action==='pickBG'){
+          var k = b.dataset.k;
+          try{ document.body.removeChild(div);}catch(err){}
+          document.documentElement.classList.remove('locked');
+          newRun(k); setActiveTab('trade');
+        }
+      });
+    }
+
+    function showMetaHub(){
+      setActiveTab('hub');
+      var div = document.createElement('div');
+      div.className = 'fixed bottom-4 right-4 glass rounded-xl p-3 text-sm z-50';
+      div.innerHTML = 'Run over. Legacy Points: '+META.legacyPoints+'. Opened Meta Hub.';
+      document.body.appendChild(div);
+      setTimeout(function(){ try{ document.body.removeChild(div);}catch(e){} }, 2500);
+    }
+
+    // ------------------ SAVE/LOAD ------------------
     function saveGame(){
-      const data = JSON.stringify(GS);
-      localStorage.setItem('euphoricdoom.save', data);
-      log('Game saved.', 'good');
+      try{ localStorage.setItem('ED_SIM_SAVE', JSON.stringify(GS)); logMessage('Game saved.');
+        try{ var ind = document.getElementById('autosave-indicator'); if(ind){ ind.classList.add('pulse'); setTimeout(function(){ ind.classList.remove('pulse'); }, 900); } }catch(_e){}
+        try{ toast('Game saved.', 'good'); }catch(_e){}
+      }
+      catch(e){ logMessage('Save failed.','bad'); }
     }
     function loadGame(){
-      const raw = localStorage.getItem('euphoricdoom.save');
-      if(!raw){ log('No save slot found.', 'bad'); return; }
+      var raw = null;
+      try{ raw = localStorage.getItem('ED_SIM_SAVE'); }catch(e){}
+      if(!raw){ logMessage('No save found.','bad'); return; }
       try{
-        const obj = JSON.parse(raw);
-        Object.assign(GS, obj);
-        // ensure integrity after load
-        rollPrices(); renderHUD();
-        log('Loaded save.', 'good');
-        // re‑render current tab
-        const active = document.querySelector('.tab-btn.active')?.dataset.tab || 'trade';
-        render(active);
-      } catch(e){ log('Corrupted save data.', 'bad'); }
+        var parsed = JSON.parse(raw);
+        GS = migrateSave(parsed);
+        updateUI(); render(); logMessage('Save loaded.','good');
+      }catch(e){ logMessage('Load failed.','bad'); }
     }
 
-    function newGame(){
-      Object.assign(GS, {
-        day: 1, location: 'market', credits: 1000, health: 100, maxHealth: 100,
-        xp:0, level:1, statPoints:0, name:'Rook', stats:{strength:5,agility:5,hacking:5,charisma:5,tech:5},
-        inventory:{}, prices:{}, capacity:50, debt:0, bank:0, stocks:{}, rumors:[]
-      });
-      triggerRumor(); rollPrices(); renderHUD(); renderTrade(); log('New game started.', 'good'); showCharCreate();
-    }
+    // Basic migration helper: accepts parsed save object and returns an upgraded GS
+    function migrateSave(parsed){
+      // If it already looks like our current GS and matches or exceeds save format, return as-is
+  if(parsed && parsed.version && parsed.version >= getSaveVersion() && parsed.market && parsed.inventory) return parsed;
 
-    // ---------- Generic router ----------
-    function render(tab){
-      $$('#nav .tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===tab));
-      switch(tab){
-        case 'trade': renderTrade(); break;
-        case 'inventory': renderInventory(); break;
-        case 'map': renderMap(); break;
-        case 'character': renderCharacter(); break;
-        case 'quests': renderQuests(); break;
-        case 'bank': renderBank(); break;
-        case 'hospital': renderHospital(); break;
-        case 'stocks': renderStocks(); break;
-        default: renderTrade();
+      // Defensive upgrade: create a fresh GS and copy known fields
+      var ng = {
+        version: getSaveVersion(),
+        day: parsed.day || 1,
+        location: parsed.location || 'slags',
+        name: parsed.name || 'Runner',
+        background: parsed.background || 'Drifter',
+        hp: parsed.hp || 30,
+        credits: parsed.credits || (parsed.money||0) || 0,
+        stats: parsed.stats || {strength:2,agility:2,charisma:1,luck:1},
+        points: parsed.points || 0,
+        inventory: parsed.inventory || parsed.prices || {},
+        prices: parsed.prices || {},
+        bank: parsed.bank || {balance:0,debt:0},
+        effects: parsed.effects || [],
+        locked: false,
+        gear: parsed.gear || {weapon:null, armor:null, pack:null, vehicle:null, property:[], lux:[]},
+        heat: parsed.heat || 0,
+        stash: parsed.stash || {},
+        perks: parsed.perks || {},
+        market: parsed.market || {},
+        dailySeed: parsed.dailySeed || {},
+        challenge: parsed.challenge || {},
+        contracts: parsed.contracts || {available:[], active:[]}
+      };
+
+      // Ensure market is initialized for missing districts
+      if(!ng.market || Object.keys(ng.market).length===0){
+        initMarket();
+        ng.market = GS.market || {};
       }
+
+      return ng;
     }
 
-    // ---------- Game Over (soft) ----------
-    function gameOver(reason){
-      log(`<b>Game Over</b> — ${reason}`, 'bad');
+  // ==================== CONTRACTS (MINIMAL) ====================
+  // Contract generation and simple lifecycle (available -> active -> fulfill)
+  // ---------------------------------------------------------------
+    function generateContracts(){
+      try{
+        GS.contracts = GS.contracts || {available:[], active:[]};
+        // Keep at most 5 available offers
+        if(GS.contracts.available.length >= 5) return;
+        var count = 2 + Math.floor(Math.random()*3);
+        for(var i=0;i<count;i++){
+          var item = CONFIG.items[randInt(0, CONFIG.items.length-1)];
+          var dest = CONFIG.districts[randInt(0, CONFIG.districts.length-1)];
+          var qty = randInt(1, Math.max(1, 3));
+          var reward = 150 + qty * (item.base || 30) + randInt(0,200);
+          var dur = randInt(3,8);
+          var id = 'ct_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+          GS.contracts.available.push({
+            id:id,
+            label: 'Deliver '+qty+'x '+item.name+' to '+dest.name,
+            itemId: item.id,
+            qty: qty,
+            dest: dest.id,
+            reward: reward,
+            expiresAt: GS.day + dur
+          });
+        }
+      }catch(_e){}
     }
 
-    // ---------- Boot ----------
-    function boot(){
-      // Wire nav
-      $$('#nav .tab-btn[data-tab]').forEach(b=> b.addEventListener('click', ()=> render(b.dataset.tab) ));
-      $('#btn-help').onclick = ()=>{ $('#modal-help').style.display='flex'; };
-      $$('[data-close]').forEach(b=> b.onclick = ()=>{ const id=b.getAttribute('data-close'); document.getElementById(id).style.display='none'; });
-      $('#btn-save').onclick = saveGame;
-      $('#btn-load').onclick = loadGame;
-      $('#btn-new').onclick = newGame;
-
-      // Initial state
-      triggerRumor();
-      rollPrices();
-      renderHUD();
-      render('trade');
-      showCharCreate();
-
-      // Quality of life: Close modals when clicking backdrop
-      $$('.modal').forEach(m=> m.addEventListener('click', (e)=>{ if(e.target===m) m.style.display='none'; }));
-
-      log('Welcome to EuphoricDoom. Trade smart, stay alive.');
+  // ====================== LOGGING ======================
+  // Message log helper functions used across the app
+  // ----------------------------------------------------
+    function logClear(){ var l=document.getElementById('log'); if(l) l.innerHTML=''; }
+    function logMessage(msg, t){
+      t = t||'';
+      var d = document.createElement('div');
+      d.className = t ? 'log-'+t : '';
+      d.textContent = msg;
+      var l = document.getElementById('log'); if(l) l.prepend(d);
     }
 
-    document.addEventListener('DOMContentLoaded', boot);
-  })();
+  // ====================== MODALS & CHOICES ======================
+  // Generic modal helpers for choices and confirmations
+  // -------------------------------------------------------------
+    function showChoices(title, options){
+      var div = document.createElement('div');
+      div.className = 'fixed inset-0 flex items-center justify-center p-4 z-50';
+      div.style.background = 'radial-gradient(ellipse at center, rgba(2,6,12,0.55), rgba(0,0,0,0.9))';
+      div.innerHTML = '<div class="glass rounded-xl p-4 max-w-md w-full modal-content" style="transform:translateY(-6px); opacity:0; animation:modal-in .18s forwards">'+
+        '<div class="font-semibold mb-2">'+title+'</div>'+
+        '<div class="grid gap-2">'+ options.map(function(o,i){ return '<button class="btn" data-i="'+i+'">'+o.label+'</button>'; }).join('') +'</div>'+
+      '</div>';
+      document.body.appendChild(div);
+      // Lock body scroll while modal is open
+      document.documentElement.classList.add('locked');
+      div.addEventListener('click', function(e){
+        var b = e.target.closest('button'); if(!b) return;
+        var i = +b.dataset.i;
+        try{ options[i].run(); }catch(err){ console.error(err); }
+        try{ document.body.removeChild(div);}catch(_e){}
+        document.documentElement.classList.remove('locked');
+        updateUI(); saveGame();
+      });
+    }
+
+    // ------------------ QoL: Settings Modal & Utilities ------------------
+    var PREFS = {
+      quickConfirm: (localStorage.getItem('ED_QUICK_CONFIRM')==='1'),
+      autosave: (localStorage.getItem('ED_AUTOSAVE')!=='0'),
+      reducedMotion: (localStorage.getItem('ED_REDUCED_MOTION')==='1')
+    };
+
+    function savePrefs(){ localStorage.setItem('ED_QUICK_CONFIRM', PREFS.quickConfirm? '1':'0'); localStorage.setItem('ED_AUTOSAVE', PREFS.autosave? '1':'0'); localStorage.setItem('ED_REDUCED_MOTION', PREFS.reducedMotion? '1':'0'); }
+
+    function showSettings(){
+      var div = document.createElement('div');
+      div.className = 'fixed inset-0 z-60 p-4'; div.style.background='radial-gradient(ellipse at center, rgba(2,6,12,0.6), rgba(0,0,0,0.9))';
+      div.innerHTML = '<div class="glass rounded-xl p-4 max-w-md mx-auto modal-content">'+
+        '<div class="font-semibold mb-2">Settings</div>'+
+        '<div class="grid gap-3">'+
+        '<label><input type="checkbox" id="pref-quick" '+(PREFS.quickConfirm? 'checked':'')+'> Quick confirm (skip bulk confirm dialog)</label>'+
+        '<label><input type="checkbox" id="pref-auto" '+(PREFS.autosave? 'checked':'')+'> Autosave on actions</label>'+
+        '<label><input type="checkbox" id="pref-motion" '+(PREFS.reducedMotion? 'checked':'')+'> Reduced motion</label>'+
+        '<div class="text-right"><button class="btn" id="prefs-close">Close</button></div>'+
+        '</div></div>';
+      document.body.appendChild(div); document.documentElement.classList.add('locked');
+      div.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; if(b.id==='prefs-close'){ var q=document.getElementById('pref-quick'); var a=document.getElementById('pref-auto'); var m=document.getElementById('pref-motion'); PREFS.quickConfirm=!!q.checked; PREFS.autosave=!!a.checked; PREFS.reducedMotion=!!m.checked; savePrefs(); toggleMotion(PREFS.reducedMotion); try{ document.body.removeChild(div);}catch(_e){} document.documentElement.classList.remove('locked'); } });
+    }
+
+    function exportSave(){ try{ var s = JSON.stringify(GS); var blob = new Blob([s], {type:'application/json'}); var url = URL.createObjectURL(blob); var a = document.createElement('a'); a.href = url; a.download = 'ed_save.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); logMessage('Exported save as ed_save.json','good'); }catch(e){ logMessage('Export failed','bad'); } }
+
+    function importSave(){ var inp=document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.addEventListener('change', function(){ var f=this.files[0]; var r=new FileReader(); r.onload=function(){ try{ var parsed = JSON.parse(r.result); GS = migrateSave(parsed); saveGame(); render(); logMessage('Imported save loaded','good'); }catch(e){ logMessage('Import failed','bad'); } }; r.readAsText(f); }); inp.click(); }
+
+    function clearLog(){ var l=document.getElementById('log'); if(l) l.innerHTML=''; }
+
+    // Buy Max: compute affordable & capacity limited units and buy them
+    function buyMax(itemId, district){
+      district = district || GS.location;
+      try{
+        var node = (GS.market[district] && GS.market[district].items[itemId]) ? GS.market[district].items[itemId] : null;
+        if(!node || node.stock<=0){ logMessage('No stock to buy.','bad'); return; }
+        var it = CONFIG.items.find(function(x){return x.id===itemId;}); var w = it? (it.weight||1):1;
+        var capRemaining = Math.max(0, capacity()-carried());
+        var maxByCarry = Math.floor(capRemaining / w);
+        if(maxByCarry<=0){ logMessage('No carry capacity.','bad'); return; }
+
+        // Determine per-unit buys until stock, cash or capacity exhausted
+        var bought = 0;
+        // Use a safety cap to avoid infinite loops
+        var safety = 10000;
+  while(safety-- > 0){
+          // Recompute current node/price each unit
+          var curNode = (GS.market[district] && GS.market[district].items[itemId]) ? GS.market[district].items[itemId] : null;
+          if(!curNode || curNode.stock<=0) break;
+          var unitPrice = askPrice(itemId, district);
+          if(GS.credits < unitPrice) break;
+          if(carried()+w > capacity()) break;
+          // Buy one unit (transactBuy will update market state if implemented to respect district)
+          // We need to ensure transactBuy respects district context; fall back to local update if not
+          try{
+            // If transactBuy supports district parameter, use it
+            if(typeof transactBuy === 'function'){
+              // try calling with district if accepted
+              try{ transactBuy(itemId, 1, district); }
+              catch(e){ transactBuy(itemId,1); }
+            } else {
+              // Manual fallback
+              GS.credits -= unitPrice;
+              GS.inventory[itemId] = (GS.inventory[itemId]||0)+1;
+              if(curNode) curNode.stock = Math.max(0, curNode.stock-1);
+            }
+          }catch(e){
+            // fallback manual adjustments
+            GS.credits -= unitPrice;
+            GS.inventory[itemId] = (GS.inventory[itemId]||0)+1;
+            if(curNode) curNode.stock = Math.max(0, curNode.stock-1);
+          }
+          bought++; if(bought>=maxByCarry) break;
+        }
+
+        if(bought<=0){ logMessage('Cannot buy any units (cash or capacity).','bad'); return; }
+        if(PREFS.quickConfirm){ render(); if(PREFS.autosave) saveGame(); logMessage('Bought '+bought+' units.','good'); }
+        else { confirmBulkTrade('buyAll', itemId, function(){ render(); if(PREFS.autosave) saveGame(); logMessage('Bought '+bought+' units.','good'); }); }
+      }catch(_e){ logMessage('BuyMax failed','bad'); }
+    }
+
+    // Confirmation modal for bulk trades
+    function confirmBulkTrade(action, itemId, cb){
+      var it = CONFIG.items.find(function(x){return x.id===itemId;});
+      var name = it ? it.name : itemId;
+      var title = (action==='buyAll') ? 'Confirm Buy All' : 'Confirm Sell All';
+      var msg = (action==='buyAll') ? ('Buy all available '+name+' until stock/credits/capacity are exhausted?') : ('Sell all your '+name+' at current market price?');
+      var div = document.createElement('div');
+      div.className = 'fixed inset-0 z-50 p-4';
+      div.style.background = 'radial-gradient(ellipse at center, rgba(2,6,12,0.6), rgba(0,0,0,0.9))';
+      div.innerHTML = '<div class="glass rounded-xl p-4 max-w-md mx-auto modal-content">'+
+        '<div class="font-semibold mb-2">'+title+'</div>'+
+        '<div class="text-sm mb-4">'+msg+'</div>'+
+        '<div class="flex gap-2 justify-end"><button class="btn" id="bulk-cancel">Cancel</button><button class="btn" id="bulk-confirm">Confirm</button></div>'+
+      '</div>';
+      document.body.appendChild(div); document.documentElement.classList.add('locked');
+      div.querySelector('#bulk-cancel').addEventListener('click', function(){ try{ document.body.removeChild(div);}catch(_e){} document.documentElement.classList.remove('locked'); });
+      div.querySelector('#bulk-confirm').addEventListener('click', function(){ try{ document.body.removeChild(div);}catch(_e){} document.documentElement.classList.remove('locked'); try{ cb(); }catch(_e){} });
+    }
+
+    // ------------------ UI REFRESH ------------------
+    function updateUI(){ render(); }
+
+    // ------------------ INIT ------------------
+    document.addEventListener('DOMContentLoaded', function(){
+      try{
+        // HUD is embedded as data-URI; no external asset detection required
+        loadMeta();
+        newRun();
+        setActiveTab('trade');
+        // Ensure the ED export exists after initialization
+        try{ exportED(); }catch(e){}
+        // Auto-run smoke test when ?smoke=1 is in the URL
+        try{
+          var qs = (location.search||'').replace('?','');
+          var params = new URLSearchParams(qs);
+          if(params.get('smoke')==='1') setTimeout(function(){ try{ runInPageSmokeTest(); }catch(e){} }, 400);
+        }catch(_e){}
+        document.addEventListener('keydown',function(e){
+          var map = ['trade','travel','store','bank','hospital','character','hub','contracts'];
+          if(e.key>='1' && e.key<='8'){ setActiveTab(map[parseInt(e.key,10)-1]); }
+          if(e.key==='s' || e.key==='S'){ e.preventDefault(); saveGame(); }
+          if(e.key==='l' || e.key==='L'){ e.preventDefault(); loadGame(); }
+        });
+        // Initialize trade UI state
+        window._TRADE_TAB = window._TRADE_TAB || 'market';
+        window._TRADE_DISTRICT = window._TRADE_DISTRICT || GS.location;
+          // Update ARIA nav state
+          try{ updateNavAria(); }catch(_e){}
+        // Motion toggle persisted preference
+        try{
+          var mt = document.getElementById('motion-toggle');
+          if(mt){
+            var pref = localStorage.getItem('ED_REDUCED_MOTION');
+            if(pref==='1') toggleMotion(true);
+            mt.addEventListener('click', function(){ var is = document.documentElement.classList.contains('reduced-motion'); toggleMotion(!is); mt.textContent = is? 'Motion' : 'Reduced'; });
+          }
+        }catch(_e){}
+        // Fullscreen toggle button handler
+        try{
+          var fsBtn = document.getElementById('fs-toggle');
+          if(fsBtn){ fsBtn.addEventListener('click', function(){
+            try{
+              if(!document.fullscreenElement){ document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+              else { document.exitFullscreen && document.exitFullscreen(); }
+            }catch(_e){}
+          }); }
+        }catch(_e){}
+        // Left nav keyboard navigation: arrow keys, Home/End, Enter/Space
+        try{
+          var leftNav = document.getElementById('left-nav');
+          if(leftNav){
+            leftNav.addEventListener('keydown', function(e){
+              var focusable = Array.from(leftNav.querySelectorAll('[role="tab"]'));
+              var idx = focusable.indexOf(document.activeElement);
+              if(e.key==='ArrowDown' || e.key==='ArrowRight'){ e.preventDefault(); var ni = Math.min(focusable.length-1, Math.max(0, idx+1)); focusable[ni].focus(); }
+              if(e.key==='ArrowUp' || e.key==='ArrowLeft'){ e.preventDefault(); var ni = Math.max(0, idx-1); focusable[ni].focus(); }
+              if(e.key==='Home'){ e.preventDefault(); focusable[0].focus(); }
+              if(e.key==='End'){ e.preventDefault(); focusable[focusable.length-1].focus(); }
+              if(e.key==='Enter' || e.key===' '){ e.preventDefault(); document.activeElement.click(); }
+            });
+          }
+          var mobileNav = document.getElementById('mobile-nav');
+          if(mobileNav){
+            mobileNav.addEventListener('keydown', function(e){
+              var focusable = Array.from(mobileNav.querySelectorAll('[role="tab"]'));
+              var idx = focusable.indexOf(document.activeElement);
+              if(e.key==='ArrowRight'){ e.preventDefault(); var ni = Math.min(focusable.length-1, Math.max(0, idx+1)); focusable[ni].focus(); }
+              if(e.key==='ArrowLeft'){ e.preventDefault(); var ni = Math.max(0, idx-1); focusable[ni].focus(); }
+              if(e.key==='Home'){ e.preventDefault(); focusable[0].focus(); }
+              if(e.key==='End'){ e.preventDefault(); focusable[focusable.length-1].focus(); }
+              if(e.key==='Enter' || e.key===' '){ e.preventDefault(); document.activeElement.click(); }
+            });
+          }
+        }catch(_e){}
+      }catch(e){
+        console.error(e);
+        var ov = document.getElementById('errorOverlay');
+        var pre = document.getElementById('errorText');
+        pre.textContent = String(e.stack || e);
+        ov.style.display='block';
+      }
+    });
   </script>
 </body>
 </html>
