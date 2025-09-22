@@ -613,7 +613,6 @@
       var itn = CONFIG.items.find(function(i){return i.id===itemId;}).name;
       var unitStr = c(Math.round(price/bought));
       logMessage('Bought '+bought+' '+itn+' @ '+unitStr+' each (total '+c(price)+'). Stock remaining: '+(node?node.stock:0), 'good');
-      try{ flashPrice(itemId, 'down'); }catch(_e){}
       return true;
     }
 
@@ -631,7 +630,6 @@
       if(bought===0){ logMessage('Could not buy any units (stock/credits/capacity).','bad'); return false; }
       GS.inventory[itemId] = (GS.inventory[itemId]||0) + bought;
       logMessage('Bought all available: '+bought+' units of '+(CONFIG.items.find(function(i){return i.id===itemId;}).name)+' for '+c(total)+'.','good');
-      try{ flashPrice(itemId, 'down'); updateCarryBar(); }catch(_e){}
       return true;
     }
 
@@ -659,7 +657,6 @@
   var itn = CONFIG.items.find(function(i){return i.id===itemId;}).name;
   var unitStr2 = c(Math.round(price/sold));
   logMessage('Sold '+sold+' '+itn+' @ '+unitStr2+' each (total '+c(price)+'). Stock now: '+(node?node.stock:0),'good');
-  try{ flashPrice(itemId, 'up'); updateCarryBar(); updateHeatGauge(); }catch(_e){}
       // Heat bump for illegal bulk sells in the district where sale occurred
       var it = CONFIG.items.find(function(x){return x.id===itemId;});
       if(it && it.illegal){
@@ -688,7 +685,6 @@
       }
       GS.credits += total;
       logMessage('Sold '+sold+' '+(CONFIG.items.find(function(i){return i.id===itemId;}).name)+' @ avg '+c(Math.round(total/sold))+' each (total '+c(total)+').','good');
-      try{ flashPrice(itemId, 'up'); updateCarryBar(); }catch(_e){}
       // heat for illegal goods
       var it = CONFIG.items.find(function(x){return x.id===itemId;});
       if(it && it.illegal){ var d = CONFIG.districts.find(function(x){return x.id===GS.location;}); var extraHeat = Math.round(sold * (d && d.priceMod>=1.05 ? 2 : 1)); GS.heat = Math.min(100, GS.heat + extraHeat); }
@@ -1459,28 +1455,34 @@
         var id = t.dataset.id;
         // one unit per click (market depth + impact handled inside)
         transactBuy(id, CONFIG.market.maxUnitsPerClick);
-        render(); saveGame();
+        render(); 
+        try { flashPrice(id, 'down'); } catch(_e){}
+        saveGame();
       }
       if(action==='sell'){
         var id2 = t.dataset.id;
         transactSell(id2, CONFIG.market.maxUnitsPerClick);
-        render(); saveGame();
+        render(); 
+        try { flashPrice(id2, 'up'); } catch(_e){}
+        saveGame();
       }
       if(action==='buyQty'){
         var idb = t.dataset.id;
         var inp = document.querySelector('input.qty[data-id="'+idb+'"]');
         var q = inp ? Math.max(1, parseInt(inp.value,10)||1) : CONFIG.market.maxUnitsPerClick;
         transactBuy(idb, q);
-        render(); saveGame();
+        render(); 
+        try { flashPrice(idb, 'down'); } catch(_e){}
+        saveGame();
       }
       if(action==='buySelected'){
-        var sel = document.getElementById('trade-item-select'); if(!sel) return; var id = sel.value; var q = Math.max(1, parseInt(document.getElementById('trade-qty').value,10)||1); transactBuy(id,q); render(); if(PREFS.autosave) saveGame();
+        var sel = document.getElementById('trade-item-select'); if(!sel) return; var id = sel.value; var q = Math.max(1, parseInt(document.getElementById('trade-qty').value,10)||1); transactBuy(id,q); render(); try { flashPrice(id, 'down'); } catch(_e){} if(PREFS.autosave) saveGame();
       }
       if(action==='sellSelected'){
-        var sel2 = document.getElementById('trade-item-select'); if(!sel2) return; var id2 = sel2.value; var q2 = Math.max(1, parseInt(document.getElementById('trade-qty').value,10)||1); transactSell(id2,q2); render(); if(PREFS.autosave) saveGame();
+        var sel2 = document.getElementById('trade-item-select'); if(!sel2) return; var id2 = sel2.value; var q2 = Math.max(1, parseInt(document.getElementById('trade-qty').value,10)||1); transactSell(id2,q2); render(); try { flashPrice(id2, 'up'); } catch(_e){} if(PREFS.autosave) saveGame();
       }
       if(action==='buyMaxSelect'){
-        var sel3 = document.getElementById('trade-item-select'); if(!sel3) return; buyMax(sel3.value); render(); if(PREFS.autosave) saveGame();
+        var sel3 = document.getElementById('trade-item-select'); if(!sel3) return; buyMax(sel3.value); render(); try { flashPrice(sel3.value, 'down'); } catch(_e){} if(PREFS.autosave) saveGame();
       }
       if(action==='toggleFavorite'){
         // Toggle favorite for current district (GS.location) + selected item
@@ -1496,21 +1498,23 @@
       }
       if(action==='buyAll'){
         var idba = t.dataset.id;
-        confirmBulkTrade('buyAll', idba, function(){ transactBuyAll(idba); render(); if(PREFS.autosave) saveGame(); });
+        confirmBulkTrade('buyAll', idba, function(){ transactBuyAll(idba); render(); try { flashPrice(idba, 'down'); } catch(_e){} if(PREFS.autosave) saveGame(); });
       }
       if(action==='sellQty'){
         var ids = t.dataset.id;
         var inps = document.querySelector('input.qty[data-id="'+ids+'"]');
         var q2 = inps ? Math.max(1, parseInt(inps.value,10)||1) : CONFIG.market.maxUnitsPerClick;
         transactSell(ids, q2);
-        render(); saveGame();
+        render(); 
+        try { flashPrice(ids, 'up'); } catch(_e){}
+        saveGame();
       }
       if(action==='sellAll'){
         var idsa = t.dataset.id;
-        confirmBulkTrade('sellAll', idsa, function(){ transactSellAll(idsa); render(); saveGame(); });
+        confirmBulkTrade('sellAll', idsa, function(){ transactSellAll(idsa); render(); try { flashPrice(idsa, 'up'); } catch(_e){} saveGame(); });
       }
       if(action==='go'){ travel(t.dataset.id); }
-  if(action==='buyMax'){ buyMax(t.dataset.id); render(); }
+  if(action==='buyMax'){ buyMax(t.dataset.id); render(); try { flashPrice(t.dataset.id, 'down'); } catch(_e){} }
       if(action==='deposit'){ if(GS.credits>=100){ GS.credits-=100; GS.bank.balance+=100; render(); saveGame(); } }
       if(action==='withdraw'){ if(GS.bank.balance>=100){ GS.bank.balance-=100; GS.credits+=100; render(); saveGame(); } }
       if(action==='borrow'){ GS.bank.debt+=100; GS.credits+=100; render(); saveGame(); }
