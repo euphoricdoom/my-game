@@ -1539,7 +1539,8 @@
       if(action==='buyBG'){
         var key = t.dataset.key, cost = parseInt(t.dataset.cost,10);
         if(META.unlocks.backgrounds.indexOf(key)>=0) return;
-        if(META.legacyPoints < cost){ logMessage('Not enough Legacy Points.','bad'); return; }
+          render();
+          try { flashPrice(id, 'down'); } catch(_e){}
         META.legacyPoints -= cost;
         META.unlocks.backgrounds.push(key);
         saveMeta(); render();
